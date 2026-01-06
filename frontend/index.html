@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Station Server Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-cloud-sun text-blue-600 text-3xl mr-3"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Weather Station Server</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="connection-status" class="flex items-center">
+                        <span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                        <span class="text-sm text-gray-600">Connected</span>
+                    </div>
+                    <div id="server-info" class="text-sm text-gray-600">
+                        <i class="fas fa-server mr-1"></i>
+                        <span id="server-ip">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="container mx-auto p-6">
+        <!-- Server Status -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Server Status</h2>
+                <button onclick="refreshServerInfo()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600" id="server-status">Running</div>
+                    <div class="text-sm text-gray-600">Status</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600" id="uptime">0h 0m</div>
+                    <div class="text-sm text-gray-600">Uptime</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-purple-600" id="data-points">0</div>
+                    <div class="text-sm text-gray-600">Data Points</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-orange-600" id="memory-usage">0 MB</div>
+                    <div class="text-sm text-gray-600">Memory</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensor Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Temperature Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fas fa-thermometer-half text-red-600 text-xl"></i>
+                    </div>
+                    <span class="text-sm text-gray-500">Temperature</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="temperature">--°C</div>
+                <div class="text-sm text-gray-500 mt-2">Server Room</div>
+            </div>
+
+            <!-- Humidity Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-tint text-blue-600 text-xl"></i>
+                    </div>
+                    <span class="text-sm text-gray-500">Humidity</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="humidity">--%</div>
+                <div class="text-sm text-gray-500 mt-2">Relative Humidity</div>
+            </div>
+
+            <!-- Air Quality Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-wind text-green-600 text-xl"></i>
+                    </div>
+                    <span class="text-sm text-gray-500">Air Quality</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="air-quality">-- ppm</div>
+                <div class="text-sm text-gray-500 mt-2">MQ135 Reading</div>
+            </div>
+
+            <!-- Light Intensity Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <i class="fas fa-sun text-yellow-600 text-xl"></i>
+                    </div>
+                    <span class="text-sm text-gray-500">Light</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="light-intensity">-- lux</div>
+                <div class="text-sm text-gray-500 mt-2">BH1750 Reading</div>
+            </div>
+        </div>
+
+        <!-- AI Prediction Section -->
+        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl shadow-lg p-6 mb-8 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold">AI Weather Prediction</h2>
+                <div class="bg-white bg-opacity-20 px-3 py-1 rounded-full">
+                    <span class="text-sm">Machine Learning</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <div class="text-lg mb-2">Predicted Condition:</div>
+                    <div class="text-3xl font-bold" id="ai-condition">Analyzing...</div>
+                </div>
+                <div>
+                    <div class="text-lg mb-2">Confidence:</div>
+                    <div class="text-3xl font-bold" id="ai-confidence">--%</div>
+                </div>
+            </div>
+            <div class="mt-6">
+                <div class="text-lg mb-3">Recommendations:</div>
+                <div id="recommendations" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="glass-effect rounded-lg p-3">
+                        <p class="text-sm">Waiting for AI analysis...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Temperature Trend (Last 10 Readings)</h3>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Humidity Trend (Last 10 Readings)</h3>
+                <div class="chart-container">
+                    <canvas id="humidityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Information -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- System Status -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">System Information</h3>
+                    <i class="fas fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Total Readings:</span>
+                        <span class="font-semibold" id="total-readings">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">AI Model:</span>
+                        <span class="font-semibold" id="model-status">Not Trained</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Data Source:</span>
+                        <span class="font-semibold text-green-600" id="data-source">Local</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Last Update:</span>
+                        <span class="text-sm" id="last-update">--</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Server Version:</span>
+                        <span class="font-semibold">3.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Configuration</h3>
+                    <i class="fas fa-cog text-gray-500"></i>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Max Readings:</span>
+                        <span class="font-semibold" id="max-readings">1000</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Backup Interval:</span>
+                        <span class="font-semibold">1 hour</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Request Timeout:</span>
+                        <span class="font-semibold">30s</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Firebase:</span>
+                        <span class="font-semibold" id="firebase-status">Disabled</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Environment:</span>
+                        <span class="font-semibold text-green-600">Production</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="flex flex-wrap gap-4 justify-center">
+            <button onclick="sendTestData()" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition shadow-lg">
+                <i class="fas fa-play mr-2"></i>Send Test Data
+            </button>
+            <button onclick="trainModel()" class="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition shadow-lg">
+                <i class="fas fa-brain mr-2"></i>Train AI Model
+            </button>
+            <button onclick="refreshData()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition shadow-lg">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh Data
+            </button>
+            <button onclick="backupData()" class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition shadow-lg">
+                <i class="fas fa-download mr-2"></i>Backup Data
+            </button>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-full transition-transform duration-300">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = '/api';
+        let updateCounter = 0;
+        let serverStartTime = Date.now();
+        
+        // Chart instances
+        let tempChart, humidityChart;
+        let chartLabels = [];
+        let temperatureData = [];
+        let humidityData = [];
+
+        // Initialize Firebase (optional)
+        const firebaseConfig = {
+            apiKey: "AIzaSyABSMbgcCN1mTWjEIrn60Buj33fSee0WdA",
+            authDomain: "weather-station-c445a.firebaseapp.com",
+            databaseURL: "https://weather-station-c445a-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "weather-station-c445a",
+            storageBucket: "weather-station-c445a.firebasestorage.app",
+            messagingSenderId: "583202989307",
+            appId: "1:583202989307:web:37f08f0a4ac54e939abc5e",
+            measurementId: "G-HC2CPJF57E"
+        };
+
+        let database = null;
+        let firebaseInitialized = false;
+        
+        try {
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            firebaseInitialized = true;
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.log('Firebase initialization failed:', error);
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const tempCtx = document.getElementById('tempChart').getContext('2d');
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: temperatureData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Time' },
+                            ticks: { maxTicksLimit: 10, maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            min: 0,
+                            max: 50,
+                            title: { display: true, text: 'Temperature (°C)' }
+                        }
+                    },
+                    animation: { duration: 0 }
+                }
+            });
+
+            const humCtx = document.getElementById('humidityChart').getContext('2d');
+            humidityChart = new Chart(humCtx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Humidity (%)',
+                        data: humidityData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Time' },
+                            ticks: { maxTicksLimit: 10, maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Humidity (%)' }
+                        }
+                    },
+                    animation: { duration: 0 }
+                }
+            });
+        }
+
+        // Load initial chart data
+        function loadInitialChartData() {
+            const initialData = [
+                { temperature: 22.0, humidity: 55.0, timestamp: '00:00:00' },
+                { temperature: 23.0, humidity: 57.0, timestamp: '00:00:10' },
+                { temperature: 21.5, humidity: 53.0, timestamp: '00:00:20' },
+                { temperature: 24.0, humidity: 60.0, timestamp: '00:00:30' },
+                { temperature: 22.5, humidity: 56.0, timestamp: '00:00:40' }
+            ];
+            
+            initialData.forEach(data => {
+                chartLabels.push(data.timestamp);
+                temperatureData.push(data.temperature);
+                humidityData.push(data.humidity);
+            });
+            
+            if (tempChart) {
+                tempChart.data.labels = [...chartLabels];
+                tempChart.data.datasets[0].data = [...temperatureData];
+                tempChart.update();
+            }
+            
+            if (humidityChart) {
+                humidityChart.data.labels = [...chartLabels];
+                humidityChart.data.datasets[0].data = [...humidityData];
+                humidityChart.update();
+            }
+        }
+
+        // Update charts with new data
+        function updateCharts(data) {
+            const timestamp = new Date().toLocaleTimeString();
+            chartLabels.push(timestamp);
+            temperatureData.push(data.temperature || 0);
+            humidityData.push(data.humidity || 0);
+            
+            // Keep only last 10 data points
+            if (chartLabels.length > 10) {
+                chartLabels.shift();
+                temperatureData.shift();
+                humidityData.shift();
+            }
+            
+            if (tempChart) {
+                tempChart.data.labels = [...chartLabels];
+                tempChart.data.datasets[0].data = [...temperatureData];
+                tempChart.update('none');
+            }
+            
+            if (humidityChart) {
+                humidityChart.data.labels = [...chartLabels];
+                humidityChart.data.datasets[0].data = [...humidityData];
+                humidityChart.update('none');
+            }
+        }
+
+        // API calls
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error(`API call failed for ${endpoint}:`, error);
+                showToast(`API Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Update dashboard
+        function updateDashboard(data) {
+            document.getElementById('temperature').textContent = `${data.temperature?.toFixed(1) || '--'}°C`;
+            document.getElementById('humidity').textContent = `${data.humidity?.toFixed(1) || '--'}%`;
+            document.getElementById('air-quality').textContent = `${data.air_quality || '--'} ppm`;
+            document.getElementById('light-intensity').textContent = `${data.light_intensity?.toFixed(0) || '--'} lux`;
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+            
+            updateCharts(data);
+        }
+
+        // Update AI prediction
+        function updateAIPrediction(prediction) {
+            if (!prediction || !prediction.condition) {
+                document.getElementById('ai-condition').textContent = 'No prediction available';
+                document.getElementById('ai-confidence').textContent = 'Confidence: --%';
+                return;
+            }
+            
+            document.getElementById('ai-condition').textContent = prediction.condition;
+            document.getElementById('ai-confidence').textContent = `Confidence: ${Math.round((prediction.confidence || 0) * 100)}%`;
+            
+            const recommendationsDiv = document.getElementById('recommendations');
+            if (prediction.recommendations && prediction.recommendations.length > 0) {
+                recommendationsDiv.innerHTML = prediction.recommendations.map(rec => 
+                    `<div class="glass-effect rounded-lg p-3">
+                        <p class="text-sm text-white">${rec}</p>
+                    </div>`
+                ).join('');
+            }
+        }
+
+        // Update server info
+        function updateServerInfo() {
+            const uptime = Date.now() - serverStartTime;
+            const hours = Math.floor(uptime / 3600000);
+            const minutes = Math.floor((uptime % 3600000) / 60000);
+            document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+        }
+
+        // Fetch server data
+        async function fetchServerData() {
+            try {
+                const stats = await apiCall('/dashboard-stats');
+                
+                document.getElementById('total-readings').textContent = stats.total_readings || 0;
+                document.getElementById('model-status').textContent = stats.model_trained ? 'Trained' : 'Not Trained';
+                document.getElementById('data-source').textContent = stats.data_source || 'Local';
+                document.getElementById('data-points').textContent = stats.total_readings || 0;
+                document.getElementById('firebase-status').textContent = stats.firebase_available ? 'Connected' : 'Disabled';
+                
+                if (stats.last_reading) {
+                    updateDashboard(stats.last_reading);
+                }
+                
+                if (stats.last_prediction) {
+                    updateAIPrediction(stats.last_prediction);
+                }
+                
+                updateCounter++;
+                document.getElementById('update-counter').textContent = updateCounter;
+                
+            } catch (error) {
+                console.error('Error fetching server data:', error);
+            }
+        }
+
+        // Fetch server health
+        async function fetchServerHealth() {
+            try {
+                const health = await apiCall('/health');
+                document.getElementById('server-status').textContent = health.status;
+                document.getElementById('memory-usage').textContent = health.memory_usage || '0 MB';
+                document.getElementById('server-ip').textContent = health.server_ip || 'Unknown';
+            } catch (error) {
+                console.error('Error fetching server health:', error);
+            }
+        }
+
+        // Control functions
+        async function sendTestData() {
+            try {
+                const testData = {
+                    temperature: 20 + Math.random() * 15,
+                    humidity: 40 + Math.random() * 40,
+                    air_quality: 50 + Math.random() * 300,
+                    light_intensity: 100 + Math.random() * 1000,
+                    battery_voltage: 3.5 + Math.random() * 0.7,
+                    timestamp: new Date().toISOString()
+                };
+                
+                const result = await apiCall('/sensor-data', {
+                    method: 'POST',
+                    body: JSON.stringify(testData)
+                });
+                
+                showToast('Test data sent successfully!', 'success');
+                fetchServerData();
+            } catch (error) {
+                showToast('Failed to send test data', 'error');
+            }
+        }
+
+        async function trainModel() {
+            try {
+                const result = await apiCall('/train-model', { method: 'POST' });
+                showToast('AI model training started!', 'success');
+                setTimeout(fetchServerData, 2000);
+            } catch (error) {
+                showToast('Failed to train AI model', 'error');
+            }
+        }
+
+        async function refreshData() {
+            await fetchServerData();
+            await fetchServerHealth();
+            showToast('Data refreshed!', 'success');
+        }
+
+        async function refreshServerInfo() {
+            await fetchServerHealth();
+            await fetchServerData();
+        }
+
+        async function backupData() {
+            try {
+                const result = await apiCall('/backup', { method: 'POST' });
+                showToast('Data backup completed!', 'success');
+            } catch (error) {
+                showToast('Failed to backup data', 'error');
+            }
+        }
+
+        // Toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toastMessage.textContent = message;
+            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-transform duration-300`;
+            
+            if (type === 'success') {
+                toast.classList.add('bg-green-600', 'text-white');
+            } else if (type === 'error') {
+                toast.classList.add('bg-red-600', 'text-white');
+            } else {
+                toast.classList.add('bg-gray-800', 'text-white');
+            }
+            
+            toast.style.transform = 'translateY(0)';
+            
+            setTimeout(() => {
+                toast.style.transform = 'translateY(100%)';
+            }, 3000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            loadInitialChartData();
+            
+            // Initial data fetch
+            fetchServerData();
+            fetchServerHealth();
+            
+            // Real-time updates
+            setInterval(fetchServerData, 5000);
+            setInterval(fetchServerHealth, 30000);
+            setInterval(updateServerInfo, 60000);
+            
+            showToast('Weather Station Server Dashboard loaded!', 'success');
+        });
+    </script>
+</body>
+</html>
