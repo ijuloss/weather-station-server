@@ -1,0 +1,53 @@
+# Weather Station Server Docker Image
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd -r weather && useradd -r -g weather weather
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/app.py ./backend/
+COPY frontend/index.html ./frontend/
+COPY frontend/styles.css ./frontend/
+
+# Create necessary directories
+RUN mkdir -p /var/log/weather-station \
+    /var/lib/weather-station \
+    /etc/weather-station \
+    /run/weather-station \
+    && chown -R weather:weather /app \
+    /var/log/weather-station \
+    /var/lib/weather-station \
+    /etc/weather-station \
+    /run/weather-station
+
+# Switch to non-root user
+USER weather
+
+# Expose port
+EXPOSE 1111
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:1111/api/health || exit 1
+
+# Start command
+CMD ["python", "backend/app.py"]

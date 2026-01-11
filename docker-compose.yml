@@ -1,0 +1,57 @@
+services:
+  weather-station:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    container_name: weather-station
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-1111}:${PORT:-1111}"
+    volumes:
+      - ./config:/etc/weather-station:ro
+      - ./data:/var/lib/weather-station
+      - ./logs:/var/log/weather-station
+    environment:
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-1111}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATA_DIR=/var/lib/weather-station
+      - CONFIG_DIR=/etc/weather-station
+      - LOG_FILE=/var/log/weather-station/app.log
+    networks:
+      - weather-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-1111}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    container_name: weather-station-nginx
+    restart: unless-stopped
+    ports:
+      - "9999:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - weather-station
+    networks:
+      - weather-network
+
+networks:
+  weather-network:
+    driver: bridge
+
+volumes:
+  weather-data:
+    driver: local
+  weather-logs:
+    driver: local

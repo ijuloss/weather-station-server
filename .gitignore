@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+
+logs/
+
+# Runtime data (persisted via volume/bind-mount)
+data/backups/
+data/models/
+data/device_configs/
+data/runtime_config.json
+
+# Model binaries (hapus baris ini jika ingin meng-commit model ke repo)
+*.pkl
+
+# TLS certificates (opsional)
+ssl/
+# Secrets
+config/server.conf
+# Python cache
+# Logs
+*.log
+**/__pycache__/
+**/*.pyc
