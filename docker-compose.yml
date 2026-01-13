@@ -5,10 +5,8 @@ services:
       dockerfile: ./docker/Dockerfile
     container_name: weather-station
     restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "${PORT:-1111}:${PORT:-1111}"
+    expose:
+      - "${PORT:-1111}"
     volumes:
       - ./config:/etc/weather-station:ro
       - ./data:/var/lib/weather-station
@@ -36,11 +34,9 @@ services:
     restart: unless-stopped
     ports:
       - "9999:80"
-      - "443:443"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./frontend:/usr/share/nginx/html:ro
-      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - weather-station
     networks:
@@ -49,9 +45,3 @@ services:
 networks:
   weather-network:
     driver: bridge
-
-volumes:
-  weather-data:
-    driver: local
-  weather-logs:
-    driver: local

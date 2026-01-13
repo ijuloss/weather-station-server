@@ -1,8 +1,8 @@
 # Secrets
-.env
-.env.*
+#.env
+#.env.*
 !.env.example
-config/server.conf
+# config/server.conf
 ssl/
 
 # Python cache

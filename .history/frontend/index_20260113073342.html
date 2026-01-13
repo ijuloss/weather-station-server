@@ -1,0 +1,3205 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Station Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA2NCA2NCc+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSdzJyB4MT0nMCcgeDI9JzEnIHkxPScwJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjZmZlMjdhJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjZmY4YTAwJy8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9J2MnIHgxPScwJyB4Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjYTdmM2QwJy8+PHN0b3Agb2Zmc2V0PScuNScgc3RvcC1jb2xvcj0nIzYwYTVmYScvPjxzdG9wIG9mZnNldD0nMScgc3RvcC1jb2xvcj0nIzIyZDNlZScvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9JzIyJyBjeT0nMjInIHI9JzEwJyBmaWxsPSd1cmwoI3MpJy8+PHBhdGggZD0nTTIyIDQ4aDI0YTEwIDEwIDAgMCAwIDAtMjAgMTMgMTMgMCAwIDAtMjUtMiA5LjUgOS41IDAgMCAwIDEgMjJ6JyBmaWxsPSd1cmwoI2MpJy8+PC9zdmc+">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=2">
+</head>
+    <body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <!-- collapse toggle removed (desktop sidebar stays full width) -->
+        <div class="sidebar-topbar">
+            <div class="sidebar-menu-slot" id="sidebarMenuSlot"></div>
+            <button type="button" class="sidebar-brand-btn" onclick="showSection('dashboard')">
+                <i class="fas fa-cloud-sun text-2xl text-white" aria-hidden="true"></i>
+                <span class="sidebar-brand-title">Weather Station</span>
+            </button>
+        </div>
+
+        <div class="sidebar-scroll">
+            <nav class="mb-2">
+                <a href="#dashboard" class="nav-item active" onclick="showSection('dashboard')">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#charts" class="nav-item" onclick="showSection('charts')">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Charts</span>
+                </a>
+                <a href="#config" class="nav-item" onclick="showSection('config')">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuration</span>
+                </a>
+                <a href="#data" class="nav-item" onclick="showSection('data')">
+                    <i class="fas fa-database"></i>
+                    <span>Data Management</span>
+                </a>
+                <a href="#export" class="nav-item" onclick="showSection('export')">
+                    <i class="fas fa-download"></i>
+                    <span>Export Data</span>
+                </a>
+                <a href="#logs" class="nav-item" onclick="showSection('logs')">
+                    <i class="fas fa-file-alt"></i>
+                    <span>System Logs</span>
+                </a>
+            </nav>
+        </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Header -->
+        <header class="glass-effect app-header">
+            <div class="px-4 lg:px-6 py-2 lg:py-4">
+                <div class="header-top">
+                    <div class="header-brand">
+                        <div class="header-menu-slot" id="headerMenuSlot">
+                            <button class="header-menu-btn" id="appMenuButton" onclick="toggleSidebar()" aria-label="Menu">
+                                <span class="menu-icon menu-icon--bars" aria-hidden="true">
+                                    <i class="fas fa-bars"></i>
+                                </span>
+                                <span class="menu-icon menu-icon--close" aria-hidden="true">
+                                    <i class="fas fa-times"></i>
+                                </span>
+                            </button>
+                        </div>
+                        <button type="button" class="header-home" onclick="showSection('dashboard')">
+                            <i class="fas fa-cloud-sun text-2xl lg:text-3xl text-white floating" aria-hidden="true"></i>
+                            <h1 class="header-title">
+                                <span class="ht-long">Weather Station Dashboard</span>
+                                <span class="ht-short">Weather Station</span>
+                            </h1>
+                        </button>
+                    </div>
+
+                    <div class="header-actions">
+                        <div class="header-battery-wrap">
+                            <button type="button" class="header-battery-pill" id="headerBatteryButton" onclick="toggleBatteryDetails()" title="Baterai" aria-label="Baterai" aria-expanded="false">
+                                <i id="header-battery-icon" class="fas fa-battery-full text-emerald-300" aria-hidden="true"></i>
+                                <i id="header-battery-bolt" class="fas fa-bolt text-yellow-300 hidden" aria-hidden="true"></i>
+                                <span class="header-battery-label">Baterai</span>
+                                <span class="header-battery-percent" id="header-battery-percent">--%</span>
+                            </button>
+                            <div id="headerBatteryPanel" class="header-battery-panel hidden" aria-label="Detail Baterai">
+                                <div class="hb-row">
+                                    <span class="hb-label">Tegangan</span>
+                                    <span class="hb-value" id="header-battery-voltage">-- V</span>
+                                </div>
+                                <div class="hb-row">
+                                    <span class="hb-label">Arus</span>
+                                    <span class="hb-value" id="header-battery-current">-- mA</span>
+                                </div>
+                                <div class="hb-row">
+                                    <span class="hb-label">Daya</span>
+                                    <span class="hb-value" id="header-battery-power">-- mW</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-secondary header-more-btn" onclick="toggleHeaderActions()" title="Aksi" aria-label="Aksi">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="headerMoreBackdrop" class="header-more-backdrop hidden" onclick="toggleHeaderActions(true)" aria-hidden="true"></div>
+
+                <div id="headerMorePanel" class="header-more-panel hidden" aria-label="Aksi">
+                    <div class="header-more-grid">
+                        <button class="header-more-item header-more-item--wide" onclick="toggleHeaderActions(true); refreshData()">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Segarkan Data</span>
+                        </button>
+                        <button class="header-more-item" onclick="toggleHeaderActions(true); openInMaps()">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <span>Peta</span>
+                        </button>
+                        <button class="header-more-item" onclick="toggleHeaderActions(true); sendTestData()">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Data Uji</span>
+                        </button>
+                        <button class="header-more-item" onclick="toggleHeaderActions(true); trainAI()">
+                            <i class="fas fa-brain"></i>
+                            <span>Latih AI</span>
+                        </button>
+	                        <button class="header-more-item" onclick="toggleHeaderActions(true); testFirebase()">
+	                            <i class="fas fa-database"></i>
+	                            <span>Uji Firebase</span>
+	                        </button>
+	                        <button class="header-more-item header-more-item--wide" id="firebaseToggleButton" onclick="toggleHeaderActions(true); toggleFirebaseConnection()">
+	                            <i class="fas fa-plug" id="firebaseToggleIcon"></i>
+	                            <span id="firebaseToggleLabel">Sambungkan Firebase</span>
+	                        </button>
+	                    </div>
+	                </div>
+
+                <div id="headerBatteryBackdrop" class="header-more-backdrop hidden" onclick="toggleBatteryDetails(true)" aria-hidden="true"></div>
+
+                <div class="header-statusbar" aria-label="Status">
+                    <div class="hs-item">
+                        <span id="server-status" class="status-indicator bg-green-500"></span>
+                        <span class="hs-label">Server</span>
+                    </div>
+                    <div class="hs-item">
+                        <span id="esp32-connection" class="status-indicator bg-gray-500"></span>
+                        <span class="hs-label">ESP32</span>
+                    </div>
+	                    <div class="hs-item">
+	                        <i class="fas fa-database text-blue-400"></i>
+	                        <span class="hs-value" id="data-source">Lokal/Direct</span>
+	                    </div>
+                    <div class="hs-item">
+                        <i class="fas fa-clock text-yellow-400"></i>
+                        <span class="hs-value" id="last-update">--:--</span>
+                    </div>
+                    <div class="hs-item">
+                        <i class="fas fa-sync-alt text-green-400"></i>
+                        <span class="hs-value" id="update-counter">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Section -->
+        <main class="px-4 lg:px-6 py-6">
+            <section id="dashboard-section" class="content-section">
+                <!-- Primary Metrics Grid -->
+                <div class="grid stack-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
+                    <!-- Temperature Card -->
+                    <div class="metric-card glass-effect rounded-xl lg:rounded-2xl hover:scale-105 transition-transform duration-300 metric-temp">
+                        <div class="metric-header">
+                            <div class="metric-header-left">
+                                <div class="metric-icon metric-icon--temp">
+                                    <i class="fas fa-thermometer-half"></i>
+                                </div>
+                                <div class="metric-badge state-warn" id="temperature-status">--</div>
+                            </div>
+                            <span class="metric-title metric-title--temp">Suhu</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-left">
+                                <div class="metric-value" id="temperature">--&deg;C</div>
+                            </div>
+                            <div class="mini-gauge mini-gauge--temp" id="gauge-temperature">
+                                <svg class="mini-gauge__svg" viewBox="0 0 100 55" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="grad-temp" x1="10" y1="0" x2="90" y2="0" gradientUnits="userSpaceOnUse">
+                                            <stop offset="0%" stop-color="#22c55e"></stop>
+                                            <stop offset="55%" stop-color="#facc15"></stop>
+                                            <stop offset="100%" stop-color="#ef4444"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="mini-gauge__track" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100"></path>
+                                    <path class="mini-gauge__progress" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100" style="stroke: url(#grad-temp)"></path>
+                                </svg>
+                                <div class="mini-gauge__needle"></div>
+                                <div class="mini-gauge__hub"></div>
+                            </div>
+                            <div class="metric-spacer"></div>
+                        </div>
+                    </div>
+
+                    <!-- Humidity Card -->
+                    <div class="metric-card glass-effect rounded-xl lg:rounded-2xl hover:scale-105 transition-transform duration-300 metric-humidity">
+                        <div class="metric-header">
+                            <div class="metric-header-left">
+                                <div class="metric-icon metric-icon--humidity">
+                                    <i class="fas fa-tint"></i>
+                                </div>
+                                <div class="metric-badge state-info" id="humidity-status">--</div>
+                            </div>
+                            <span class="metric-title metric-title--humidity">Kelembapan</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-left">
+                                <div class="metric-value" id="humidity">--%</div>
+                            </div>
+                            <div class="mini-gauge mini-gauge--humidity" id="gauge-humidity">
+                                <svg class="mini-gauge__svg" viewBox="0 0 100 55" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="grad-humidity" x1="10" y1="0" x2="90" y2="0" gradientUnits="userSpaceOnUse">
+                                            <stop offset="0%" stop-color="#22d3ee"></stop>
+                                            <stop offset="60%" stop-color="#3b82f6"></stop>
+                                            <stop offset="100%" stop-color="#1d4ed8"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="mini-gauge__track" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100"></path>
+                                    <path class="mini-gauge__progress" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100" style="stroke: url(#grad-humidity)"></path>
+                                </svg>
+                                <div class="mini-gauge__needle"></div>
+                                <div class="mini-gauge__hub"></div>
+                            </div>
+                            <div class="metric-spacer"></div>
+                        </div>
+                    </div>
+
+                    <!-- Air Quality Card -->
+                    <div class="metric-card glass-effect rounded-xl lg:rounded-2xl hover:scale-105 transition-transform duration-300 metric-air">
+                        <div class="metric-header">
+                            <div class="metric-header-left">
+                                <div class="metric-icon metric-icon--air">
+                                    <i class="fas fa-wind"></i>
+                                </div>
+                                <div class="metric-badge state-good" id="air-quality-status">--</div>
+                            </div>
+                            <span class="metric-title metric-title--air">Kualitas Udara</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-left">
+                                <div class="metric-value" id="air-quality">-- ppm</div>
+                            </div>
+                            <div class="mini-gauge mini-gauge--air" id="gauge-air">
+                                <svg class="mini-gauge__svg" viewBox="0 0 100 55" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="grad-air" x1="10" y1="0" x2="90" y2="0" gradientUnits="userSpaceOnUse">
+                                            <stop offset="0%" stop-color="#22c55e"></stop>
+                                            <stop offset="55%" stop-color="#facc15"></stop>
+                                            <stop offset="100%" stop-color="#ef4444"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="mini-gauge__track" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100"></path>
+                                    <path class="mini-gauge__progress" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100" style="stroke: url(#grad-air)"></path>
+                                </svg>
+                                <div class="mini-gauge__needle"></div>
+                                <div class="mini-gauge__hub"></div>
+                            </div>
+                            <div class="metric-spacer"></div>
+                        </div>
+                    </div>
+
+                    <!-- Light Intensity Card -->
+                    <div class="metric-card glass-effect rounded-xl lg:rounded-2xl hover:scale-105 transition-transform duration-300 metric-light">
+                        <div class="metric-header">
+                            <div class="metric-header-left">
+                                <div class="metric-icon metric-icon--light">
+                                    <i class="fas fa-sun"></i>
+                                </div>
+                                <div class="metric-badge state-good" id="light-status">--</div>
+                            </div>
+                            <span class="metric-title metric-title--light">Intensitas Cahaya</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-left">
+                                <div class="metric-value" id="light-intensity">-- lux</div>
+                            </div>
+                            <div class="mini-gauge mini-gauge--light" id="gauge-light">
+                                <svg class="mini-gauge__svg" viewBox="0 0 100 55" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="grad-light" x1="10" y1="0" x2="90" y2="0" gradientUnits="userSpaceOnUse">
+                                            <stop offset="0%" stop-color="#64748b"></stop>
+                                            <stop offset="55%" stop-color="#facc15"></stop>
+                                            <stop offset="100%" stop-color="#f97316"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="mini-gauge__track" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100"></path>
+                                    <path class="mini-gauge__progress" d="M 10 50 A 40 40 0 0 1 90 50" pathLength="100" style="stroke: url(#grad-light)"></path>
+                                </svg>
+                                <div class="mini-gauge__needle"></div>
+                                <div class="mini-gauge__hub"></div>
+                            </div>
+                            <div class="metric-spacer"></div>
+                        </div>
+                    </div>
+                </div>
+
+            <!-- Secondary Information Grid -->
+            <div class="grid stack-grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
+                <!-- GPS Location -->
+                <div class="glass-effect info-card gps-card rounded-xl lg:rounded-2xl p-4 lg:p-6">
+                    <div class="flex items-center justify-between mb-3 lg:mb-4">
+                        <div class="bg-indigo-500/30 p-2 lg:p-3 rounded-lg lg:rounded-xl info-card-icon">
+                            <i class="fas fa-map-marker-alt text-lg lg:text-2xl text-indigo-300"></i>
+                        </div>
+                        <span class="card-title text-indigo-300">Lokasi GPS</span>
+                    </div>
+                    <div class="space-y-2 lg:space-y-2 gps-rows">
+                        <div class="flex justify-between text-white">
+                            <span class="text-xs lg:text-sm">Lintang :</span>
+                            <span class="text-xs lg:text-sm font-medium" id="gps-lat">--</span>
+                        </div>
+                        <div class="flex justify-between text-white">
+                            <span class="text-xs lg:text-sm">Bujur :</span>
+                            <span class="text-xs lg:text-sm font-medium" id="gps-lng">--</span>
+                        </div>
+                        <div class="flex justify-between text-white">
+                            <span class="text-xs lg:text-sm">Lokasi :</span>
+                            <span class="text-xs lg:text-sm font-medium" id="gps-location">--</span>
+                        </div>
+                    </div>
+                    <div class="gps-actions">
+                        <button class="gps-open-btn" type="button" onclick="openInMaps()">
+                            <i class="fas fa-map-marked-alt" aria-hidden="true"></i>
+                            Buka di Google Maps
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Prediction (full width) -->
+                <div class="glass-effect rounded-xl lg:rounded-2xl p-4 lg:p-6 lg:col-span-2 ai-card">
+                    <div class="flex items-center justify-between mb-3 lg:mb-4">
+                        <div class="bg-purple-500/30 p-2 lg:p-3 rounded-lg lg:rounded-xl info-card-icon">
+                            <i class="fas fa-brain text-lg lg:text-2xl text-purple-300"></i>
+                        </div>
+                        <span class="card-title text-purple-300">Prediksi AI</span>
+                    </div>
+                    <div class="ai-prediction">
+                        <div class="ai-now">
+                            <div class="ai-label">Saat ini</div>
+                            <div class="ai-now-main">
+                                <div class="ai-now-temp" id="ai-now-temp">--&deg;</div>
+                                <div class="ai-now-type" id="ai-now-type">--</div>
+                                <div class="ai-now-sub" id="ai-now-sub">Kelembapan --%</div>
+                            </div>
+                            <div class="ai-reco-container">
+                                <div class="ai-reco">
+                                    <div class="ai-reco-label">Rekomendasi</div>
+                                    <div class="ai-reco-text" id="ai-recommendation">Menunggu data...</div>
+                                </div>
+                            </div>
+
+                            <!-- Evaluation banner (hidden by default) -->
+                            <div id="ai-metrics-banner" class="ai-banner" style="display:none;">
+                                <div class="left"><span id="ai-banner-badge" class="metric-badge badge-info">UNKNOWN</span><div class="title" id="ai-banner-title">Evaluasi AI</div></div>
+                                <div class="banner-msg" id="ai-banner-body">Metrik tidak representatif.</div>
+                                <div class="ai-model-meta" id="ai-model-meta" style="font-size:12px;color:#cbd5e1;min-width:0;text-align:right"></div>
+                            </div>
+
+                            <div class="ai-rain-time" id="ai-rain-time">--</div>
+                        </div>
+                        <div class="ai-forecast">
+                            <div class="ai-label">3 jam ke depan</div>
+                            <div class="ai-forecast-row" id="ai-forecast-row">
+                                <!-- injected -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </main>
+
+	        <!-- Charts Section (Single Chart) -->
+		        <section id="charts-section" class="content-section px-4 lg:px-6 py-6" style="display: none;">
+	            <div class="grid stack-grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mb-6">
+                <!-- Temperature Chart -->
+                <div class="glass-effect rounded-xl lg:rounded-2xl p-4 lg:p-6">
+                    <h3 class="card-title text-white mb-3 lg:mb-4 flex items-center">
+                        <i class="fas fa-chart-line mr-2 lg:mr-3 text-orange-400"></i>
+                        Tren Suhu
+                    </h3>
+                    <div class="chart-wrapper">
+                        <canvas id="tempChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+	                <!-- Humidity Chart -->
+	                <div class="glass-effect rounded-xl lg:rounded-2xl p-4 lg:p-6">
+	                    <h3 class="card-title text-white mb-3 lg:mb-4 flex items-center">
+	                        <i class="fas fa-chart-area mr-2 lg:mr-3 text-blue-400"></i>
+	                        Tren Kelembapan
+	                    </h3>
+	                    <div class="chart-wrapper">
+	                        <canvas id="humidityChart" width="400" height="200"></canvas>
+	                    </div>
+	                </div>
+
+	                <!-- Air Quality Chart -->
+	                <div class="glass-effect rounded-xl lg:rounded-2xl p-4 lg:p-6">
+	                    <h3 class="card-title text-white mb-3 lg:mb-4 flex items-center">
+	                        <i class="fas fa-wind mr-2 lg:mr-3 text-emerald-400"></i>
+	                        Tren Kualitas Udara
+	                    </h3>
+	                    <div class="chart-wrapper">
+	                        <canvas id="airQualityChart" width="400" height="200"></canvas>
+	                    </div>
+	                </div>
+
+	                <!-- Light Intensity Chart -->
+	                <div class="glass-effect rounded-xl lg:rounded-2xl p-4 lg:p-6">
+	                    <h3 class="card-title text-white mb-3 lg:mb-4 flex items-center">
+	                        <i class="fas fa-sun mr-2 lg:mr-3 text-yellow-300"></i>
+	                        Tren Intensitas Cahaya
+	                    </h3>
+	                    <div class="chart-wrapper">
+	                        <canvas id="lightChart" width="400" height="200"></canvas>
+	                    </div>
+	                </div>
+	            </div>
+	        </section>
+
+        <!-- Configuration Section -->
+        <section id="config-section" class="content-section" style="display: none;">
+            <div class="glass-effect rounded-3xl p-6 space-y-6 mb-6">
+                <div class="config-header flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">System Configuration</h2>
+                        <p class="text-gray-300 leading-relaxed max-w-2xl">
+                            Atur pengalaman pengumpulan data dan backend secara terpusat. Nilai yang kamu simpan akan tersimpan di storage server
+                            dan dikirim otomatis ke perangkat maupun AI training pipeline.
+                        </p>
+                    </div>
+                    <div class="text-right text-sm text-gray-400">
+                        <p class="font-semibold text-gray-100">Status sinkronisasi</p>
+                        <p id="config-sync-status">Terakhir disimpan: <span class="font-medium text-white">Belum ada</span></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+                    <div class="config-panel bg-gradient-to-b from-slate-900/80 to-slate-900/40 border border-white/10 shadow-lg shadow-slate-900/40">
+                        <h3 class="text-white font-semibold mb-4">Sensor Settings</h3>
+                        <div class="config-item">
+                            <label class="config-label">Temperature Unit</label>
+                            <select class="config-input" id="tempUnit">
+                                <option value="celsius">Celsius</option>
+                                <option value="fahrenheit">Fahrenheit</option>
+                            </select>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Sensor Calibration</label>
+                            <input type="number" class="config-input" id="tempCalibration" value="0" step="0.1">
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Reading Frequency</label>
+                            <select class="config-input" id="readingFrequency">
+                                <option value="1">1 second</option>
+                                <option value="5" selected>5 seconds</option>
+                                <option value="10">10 seconds</option>
+                                <option value="30">30 seconds</option>
+                            </select>
+                        </div>
+                        <p class="text-gray-400 text-sm mt-2">Pengaturan ini memengaruhi pengiriman data ke server dan pemrosesan AI.</p>
+                    </div>
+                    <div class="config-panel bg-gradient-to-b from-emerald-900/60 to-emerald-900/30 border border-white/10 shadow-lg shadow-emerald-900/40">
+                        <h3 class="text-white font-semibold mb-4">Network & API</h3>
+                        <div class="config-item">
+                            <label class="config-label">Alamat Server (opsional)</label>
+                            <input type="text" class="config-input" id="serverUrl" value="" placeholder="https://alamat-server-anda (opsional)">
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">API Key</label>
+                            <input type="password" class="config-input" id="apiKey">
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Connection Timeout (detik)</label>
+                            <input type="number" class="config-input" id="timeout" value="10" min="1" max="60">
+                        </div>
+                        <p class="text-gray-400 text-sm mt-2">Nilai timeout akan menghindarkan tampilan dari gagal request saat server sibuk.</p>
+                    </div>
+                    <div class="config-panel bg-gradient-to-b from-blue-900/60 to-blue-900/20 border border-white/10 shadow-lg shadow-blue-900/40">
+                        <h3 class="text-white font-semibold mb-4">ESP32 Timing & Backend</h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div class="config-item">
+                                <label class="config-label">Sensor Read Interval (ms)</label>
+                                <input type="number" class="config-input" id="esp32SensorReadMs" min="100" step="100" placeholder="3000">
+                            </div>
+                            <div class="config-item">
+                                <label class="config-label">Data Send Interval (ms)</label>
+                                <input type="number" class="config-input" id="esp32DataSendMs" min="100" step="100" placeholder="5000">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div class="config-item">
+                                    <label class="config-label">GPS Update Interval (ms)</label>
+                                    <input type="number" class="config-input" id="esp32GpsUpdateMs" min="100" step="100" placeholder="10000">
+                                </div>
+                                <div class="config-item">
+                                    <label class="config-label">WiFi Check Interval (ms)</label>
+                                    <input type="number" class="config-input" id="esp32WifiCheckMs" min="100" step="100" placeholder="5000">
+                                </div>
+                            </div>
+                            <div class="config-item">
+                                <label class="config-label">Default Backend URL</label>
+                                <input type="text" class="config-input" id="esp32DefaultServerUrl" placeholder="https://alamat-server-anda">
+                            </div>
+                        </div>
+                        <p class="text-gray-300 text-sm mt-2">Otomatis dikirim ke file <code>esp32_config.json</code> agar firmware mematuhi interval yang kamu tentukan.</p>
+                    </div>
+                </div>
+                <!-- ESP32 Device Configuration Panel -->
+                <div class="config-panel bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-cyan-900/20 border border-cyan-500/20 shadow-2xl shadow-cyan-900/20 rounded-2xl p-6">
+                    <!-- Header -->
+                    <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-8 pb-6 border-b border-white/10">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                                <i class="fas fa-microchip text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-white font-bold text-xl mb-1">Pengaturan Perangkat ESP32</h3>
+                                <p class="text-gray-400 text-sm max-w-lg">Kirim konfigurasi secara real-time ke perangkat. Pastikan Device ID sesuai dengan firmware.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-3 xl:flex-nowrap">
+                            <button class="btn-secondary flex items-center gap-2 px-4 py-2.5 rounded-xl" onclick="loadDeviceCommandPreview()">
+                                <i class="fas fa-search"></i> Cek Perintah
+                            </button>
+                            <button class="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/30" onclick="pushDeviceConfig()">
+                                <i class="fas fa-paper-plane"></i> Kirim Konfigurasi
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status bar -->
+                    <div id="deviceConfigStatus" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+
+                    <!-- Row 1: Device ID, Interval, Command ID -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="space-y-2">
+                            <label class="config-label flex items-center gap-2 text-gray-300 font-medium">
+                                <i class="fas fa-hashtag text-cyan-400"></i> Device ID
+                            </label>
+                            <input type="text" class="config-input w-full px-4 py-3 rounded-xl bg-slate-800/60 border border-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all" id="deviceIdInput" placeholder="contoh: esp32-1">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="config-label flex items-center gap-2 text-gray-300 font-medium">
+                                <i class="fas fa-clock text-cyan-400"></i> Interval Kirim (detik)
+                            </label>
+                            <input type="number" class="config-input w-full px-4 py-3 rounded-xl bg-slate-800/60 border border-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all" id="deviceSensorInterval" min="1" max="60" value="5">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="config-label flex items-center gap-2 text-gray-300 font-medium">
+                                <i class="fas fa-fingerprint text-cyan-400"></i> Command ID Terakhir
+                            </label>
+                            <input type="text" class="config-input w-full px-4 py-3 rounded-xl bg-slate-700/40 border border-white/5 cursor-not-allowed text-gray-400" id="deviceLastCommandId" value="-" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Sensors + Calibration with more spacing -->
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-10">
+                        <!-- Sensors Card -->
+                        <div class="p-6 bg-gradient-to-br from-slate-800/50 to-slate-900/30 rounded-2xl border border-white/10 shadow-lg">
+                            <div class="flex items-center gap-3 mb-5">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                                    <i class="fas fa-sliders-h text-emerald-400"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-semibold">Sensor yang Diaktifkan</h4>
+                                    <p class="text-gray-500 text-xs">Pilih sensor untuk dikirim</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorTemperature" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-thermometer-half text-orange-400 w-5 text-center"></i> Suhu</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorHumidity" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-tint text-blue-400 w-5 text-center"></i> Kelembapan</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorAirQuality" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-wind text-emerald-400 w-5 text-center"></i> Kualitas Udara</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorLight" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-sun text-yellow-400 w-5 text-center"></i> Intensitas Cahaya</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorBattery" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-battery-half text-green-400 w-5 text-center"></i> Tegangan Baterai</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorGps" class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-map-marker-alt text-red-400 w-5 text-center"></i> GPS</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorCurrent" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-bolt text-yellow-300 w-5 text-center"></i> Arus (mA)</span>
+                                </label>
+                                <label class="checkbox-row flex items-center gap-3 cursor-pointer bg-slate-700/30 hover:bg-slate-700/50 p-3 rounded-xl border border-transparent hover:border-white/10 transition-all">
+                                    <input type="checkbox" id="devSensorPower" checked class="w-5 h-5 accent-cyan-500 rounded">
+                                    <span class="flex items-center gap-2 text-gray-200"><i class="fas fa-plug text-purple-400 w-5 text-center"></i> Daya (mW)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Calibration Card -->
+                        <div class="p-6 bg-gradient-to-br from-slate-800/50 to-slate-900/30 rounded-2xl border border-white/10 shadow-lg">
+                            <div class="flex items-center gap-3 mb-5">
+                                <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                                    <i class="fas fa-wrench text-amber-400"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-semibold">Kalibrasi Sensor</h4>
+                                    <p class="text-gray-500 text-xs">Format JSON (opsional)</p>
+                                </div>
+                            </div>
+                            <textarea class="config-input font-mono text-sm w-full px-4 py-3 rounded-xl bg-slate-800/60 border border-white/10 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none" id="devCalibrationJson" rows="8" placeholder='{
+  "temperature": 0.0,
+  "humidity": 0.0,
+  "air_quality": 0
+}'></textarea>
+                            <div class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-white/5">
+                                <p class="text-gray-400 text-xs flex items-start gap-2">
+                                    <i class="fas fa-info-circle text-cyan-400 mt-0.5"></i>
+                                    <span>Kosongkan jika tidak ada kalibrasi. Format: <code class="text-cyan-400 bg-slate-800 px-1.5 py-0.5 rounded">{"sensor": offset}</code></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button class="btn-secondary" onclick="resetConfig()">Reset to Default</button>
+                    <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Management Section -->
+        <section id="data-section" class="content-section" style="display: none;">
+            <div class="glass-effect rounded-2xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-6">Data Management</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="info-card">
+                        <div class="info-label">Total Records</div>
+                        <div class="info-value" id="totalDataRecords">0</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Database Size</div>
+                        <div class="info-value" id="databaseSize">0 MB</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Last Backup</div>
+                        <div class="info-value" id="lastBackup">Never</div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button class="btn-secondary" onclick="clearOldData()">
+                        <i class="fas fa-trash"></i>
+                        Clear Old Data
+                    </button>
+                    <button class="btn-secondary" onclick="createBackup()">
+                        <i class="fas fa-save"></i>
+                        Create Backup
+                    </button>
+                    <button class="btn-primary" onclick="restoreBackup()">
+                        <i class="fas fa-upload"></i>
+                        Restore Backup
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Export Section -->
+        <section id="export-section" class="content-section" style="display: none;">
+            <div class="glass-effect rounded-2xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-6">Export Data</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="config-panel">
+                        <h3 class="text-white font-semibold mb-4">Export Options</h3>
+                        <div class="config-item">
+                            <label class="config-label">Date Range</label>
+                            <div class="flex space-x-2">
+                                <input type="date" class="config-input" id="startDate">
+                                <input type="date" class="config-input" id="endDate">
+                            </div>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Format</label>
+                            <select class="config-input" id="exportFormat">
+                                <option value="csv">CSV</option>
+                                <option value="json">JSON</option>
+                                <option value="excel">Excel</option>
+                            </select>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Data Type</label>
+                            <select class="config-input" id="dataType">
+                                <option value="all">All Data</option>
+                                <option value="sensors">Sensor Data Only</option>
+                                <option value="predictions">Predictions Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="config-panel">
+                        <h3 class="text-white font-semibold mb-4">Scheduled Exports</h3>
+                        <div class="config-item">
+                            <label class="config-label">Enable Auto Export</label>
+                            <div class="toggle-switch" id="autoExportToggle" onclick="toggleAutoExport()"></div>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Export Schedule</label>
+                            <select class="config-input" id="exportSchedule">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label">Export Email</label>
+                            <input type="email" class="config-input" id="exportEmail" placeholder="email@example.com">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button class="btn-secondary" onclick="previewExport()">Preview</button>
+                    <button class="btn-primary" onclick="downloadExport()">
+                        <i class="fas fa-download"></i>
+                        Download Export
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Logs Section -->
+        <section id="logs-section" class="content-section" style="display: none;">
+            <div class="logs-shell glass-effect rounded-2xl p-6 lg:p-8 mb-6">
+                <h2 class="text-2xl font-bold text-white mb-6">System Logs</h2>
+                <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 mb-4">
+                    <div class="flex flex-wrap gap-2">
+                        <button class="btn-secondary" onclick="refreshLogs()">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                        <button class="btn-secondary" onclick="clearLogs()">
+                            <i class="fas fa-trash"></i>
+                            Clear
+                        </button>
+                        <button class="btn-primary" onclick="downloadLogs()">
+                            <i class="fas fa-download"></i>
+                            Download
+                        </button>
+                    </div>
+                    <select class="config-input max-w-[180px]" id="logLevel">
+                        <option value="all">All Levels</option>
+                        <option value="error">Errors Only</option>
+                        <option value="warning">Warnings</option>
+                        <option value="info">Info Only</option>
+                    </select>
+                </div>
+                <div id="logContainer">
+                    <div>System logs will appear here...</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>
+        // Konfigurasi
+        let updateCounter = 0;
+        let serverStartTime = Date.now();
+        let autoRefreshEnabled = true;
+        let currentSection = 'dashboard';
+        let clientSettings = {
+            update_interval: 5,
+            esp32_offline_seconds: 15,
+            auto_refresh: true
+        };
+        let esp32ConfigState = null;
+        let dataTimer = null;
+        let statusTimer = null;
+        let lastUpdateIso = null;
+        let freezeLastUpdate = false;
+        let frozenLastUpdateIso = null;
+        
+	        // Chart instances
+	        let tempChart, humidityChart, airChart, lightChart;
+	        let chartLabels = [];
+	        let temperatureData = [];
+	        let humidityData = [];
+	        let airQualityData = [];
+	        let lightIntensityData = [];
+        
+        // Advanced chart instance
+	        let advancedChartInstance = null;
+
+	        let socketConnected = false;
+	        let firebaseEnabledState = false;
+	        let firebaseToggleBusy = false;
+	        let pendingUpdate = null;
+	        let pendingRaf = null;
+	        let lastStatusAt = 0;
+        const STATUS_POLL_MS = 1000;
+        const addressCache = {};
+
+        function apiUrl(path) {
+            const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+            return normalizedPath;
+        }
+
+        function scheduleUiUpdate(data) {
+            pendingUpdate = data;
+            if (pendingRaf) return;
+            pendingRaf = requestAnimationFrame(() => {
+                pendingRaf = null;
+                const next = pendingUpdate;
+                pendingUpdate = null;
+                if (!next) return;
+                updateDashboardEnhanced(next);
+                updateCharts(next);
+            });
+        }
+        
+        // UI Functions
+        function toggleSidebar() {
+            document.body.classList.toggle('sidebar-open');
+            requestAnimationFrame(syncMenuButtonLocation);
+        }
+
+        function syncMenuButtonLocation() {
+            const button = document.getElementById('appMenuButton');
+            const headerSlot = document.getElementById('headerMenuSlot');
+            const sidebarSlot = document.getElementById('sidebarMenuSlot');
+            if (!button || !headerSlot || !sidebarSlot) return;
+
+            const isOpen = document.body.classList.contains('sidebar-open');
+            const target = isOpen ? sidebarSlot : headerSlot;
+            if (button.parentElement !== target) {
+                const from = button.getBoundingClientRect();
+                target.appendChild(button);
+                const to = button.getBoundingClientRect();
+                const dx = from.left - to.left;
+                const dy = from.top - to.top;
+                if (typeof button.animate === 'function') {
+                    button.animate(
+                        [
+                            { transform: `translate(${dx}px, ${dy}px) scale(0.92)` },
+                            { transform: 'translate(0, 0) scale(1)' }
+                        ],
+                        { duration: 450, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+                    );
+                }
+            }
+            button.setAttribute('aria-label', isOpen ? 'Tutup Menu' : 'Menu');
+            button.title = isOpen ? 'Tutup Menu' : 'Menu';
+            button.classList.toggle('is-open', isOpen);
+        }
+
+        function closeSidebar() {
+            document.body.classList.remove('sidebar-open');
+            requestAnimationFrame(syncMenuButtonLocation);
+        }
+
+        function initSidebarState(forceClose = false) {
+            // Disable collapsed sidebar mode (desktop stays full width)
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.remove('collapsed');
+            document.body.classList.remove('sidebar-collapsed');
+            try { localStorage.removeItem('sidebarCollapsed'); } catch (_) { /* ignore */ }
+
+            if (forceClose) {
+                document.body.classList.remove('sidebar-open');
+            }
+
+            requestAnimationFrame(syncMenuButtonLocation);
+        }
+        
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Show selected section
+            const targetSection = document.getElementById(sectionName + '-section');
+            if (targetSection) {
+                targetSection.style.display = 'block';
+            }
+            
+            // Update navigation
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const evt = typeof event !== 'undefined' ? event : null;
+            const nav = evt?.target?.closest ? evt.target.closest('.nav-item') : null;
+            if (nav) {
+                nav.classList.add('active');
+            } else {
+                const match = document.querySelector(`.nav-item[href=\"#${sectionName}\"]`);
+                if (match) match.classList.add('active');
+            }
+            
+            currentSection = sectionName;
+
+            if (window.innerWidth < 1024) {
+                closeSidebar();
+            }
+            
+	            // Initialize section-specific features
+	            if (sectionName === 'charts') {
+	                setTimeout(() => {
+	                    try {
+	                        if (!tempChart || !humidityChart || !airChart || !lightChart) initCharts();
+	                        if (tempChart && typeof tempChart.resize === 'function') tempChart.resize();
+	                        if (humidityChart && typeof humidityChart.resize === 'function') humidityChart.resize();
+	                        if (airChart && typeof airChart.resize === 'function') airChart.resize();
+	                        if (lightChart && typeof lightChart.resize === 'function') lightChart.resize();
+	                    } catch (e) {
+	                        console.warn('Gagal menyiapkan grafik:', e);
+	                    }
+	                }, 120);
+	            } else if (sectionName === 'logs') {
+	                loadLogs();
+	            }
+	        }
+
+        function applyClientSettingsToUI() {
+            const intervalInput = document.getElementById('updateInterval');
+            const offlineInput = document.getElementById('esp32OfflineSeconds');
+            const toggle = document.getElementById('autoRefreshToggle');
+            const activeLabel = document.getElementById('activeIntervalLabel');
+            const updatedLabel = document.getElementById('settingsUpdatedAt');
+
+            if (!intervalInput && !offlineInput && !toggle && !activeLabel && !updatedLabel) return;
+
+            const cs = (typeof clientSettings === 'object' && clientSettings) ? clientSettings : {};
+            const interval = Math.max(1, Math.min(3600, parseInt(cs.update_interval, 10) || 5));
+            const offline = Math.max(1, Math.min(600, parseInt(cs.esp32_offline_seconds, 10) || 15));
+            const auto = (typeof cs.auto_refresh === 'boolean') ? cs.auto_refresh : true;
+
+            if (intervalInput) intervalInput.value = interval;
+            if (offlineInput) offlineInput.value = offline;
+            if (toggle) toggle.classList.toggle('active', auto);
+            if (activeLabel) activeLabel.textContent = `${interval} detik`;
+            if (updatedLabel) updatedLabel.textContent = new Date().toLocaleString('id-ID');
+        }
+
+        function loadClientSettingsFromInputs() {
+            if (typeof clientSettings !== 'object' || !clientSettings) {
+                console.warn('clientSettings belum siap, input pengaturan diabaikan.');
+                return;
+            }
+            const intervalInput = document.getElementById('updateInterval');
+            const offlineInput = document.getElementById('esp32OfflineSeconds');
+            const toggle = document.getElementById('autoRefreshToggle');
+
+            const intervalVal = parseInt(intervalInput?.value || '5', 10);
+            const offlineVal = parseInt(offlineInput?.value || '15', 10);
+            clientSettings.update_interval = Math.max(1, Math.min(3600, isNaN(intervalVal) ? 5 : intervalVal));
+            clientSettings.esp32_offline_seconds = Math.max(1, Math.min(600, isNaN(offlineVal) ? 15 : offlineVal));
+            clientSettings.auto_refresh = toggle ? toggle.classList.contains('active') : (typeof clientSettings.auto_refresh === 'boolean' ? clientSettings.auto_refresh : true);
+            autoRefreshEnabled = clientSettings.auto_refresh;
+        }
+
+        function handleUpdateIntervalChange() {
+            loadClientSettingsFromInputs();
+            applyClientSettingsToUI();
+            restartDataTimer();
+        }
+
+        function handleSaveClientSettings() {
+            loadClientSettingsFromInputs();
+            applyClientSettingsToUI();
+            restartDataTimer();
+            startStatusPolling(); // status tetap aktif
+            showToast('Pengaturan disimpan & interval diterapkan', 'success', 2000);
+        }
+        
+        function toggleAutoRefresh() {
+            const toggle = document.getElementById('autoRefreshToggle');
+            autoRefreshEnabled = !autoRefreshEnabled;
+            clientSettings.auto_refresh = autoRefreshEnabled;
+            toggle.classList.toggle('active');
+            
+            if (autoRefreshEnabled) {
+                showToast('Auto-refresh enabled', 'success');
+                freezeLastUpdate = false;
+                frozenLastUpdateIso = null;
+                restartDataTimer();
+                fetchInitialData();
+            } else {
+                showToast('Auto-refresh disabled', 'warning');
+                freezeLastUpdate = true;
+                frozenLastUpdateIso = lastUpdateIso;
+                if (dataTimer) {
+                    clearInterval(dataTimer);
+                    dataTimer = null;
+                }
+            }
+        }
+        
+        function toggleAutoExport() {
+            const toggle = document.getElementById('autoExportToggle');
+            toggle.classList.toggle('active');
+            const enabled = toggle.classList.contains('active');
+            showToast(`Auto-export ${enabled ? 'enabled' : 'disabled'}`, enabled ? 'success' : 'warning');
+        }
+        
+        function exportData() {
+            showSection('export');
+        }
+        
+        function showSettings() {
+            showSection('config');
+        }
+        
+        function switchChart(chartType, ev) {
+            // Update button states
+            document.querySelectorAll('#charts-section .btn-secondary').forEach(btn => {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+            });
+            
+            const target = ev?.target;
+            if (target) {
+                target.classList.remove('btn-secondary');
+                target.classList.add('btn-primary');
+            }
+            
+            // Update chart based on type
+            updateAdvancedChart(chartType);
+        }
+        
+        function updateAdvancedChart(chartType) {
+            const ctx = document.getElementById('advancedChart');
+            if (!ctx) return;
+            
+            // Destroy existing chart if it exists
+            if (window.advancedChartInstance) {
+                window.advancedChartInstance.destroy();
+            }
+            
+            let chartConfig = {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 0 },
+                    plugins: {
+                        legend: { display: true, labels: { color: 'rgba(255, 255, 255, 0.9)' } }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                        },
+                        x: { 
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                        }
+                    }
+                }
+            };
+            
+            switch(chartType) {
+                case 'temperature':
+                    chartConfig.data.datasets = [{
+                        label: 'Suhu (\u00B0C)',
+                        data: [22, 24, 23, 25, 26, 24, 23],
+                        borderColor: 'rgb(251, 146, 60)',
+                        backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }];
+                    break;
+                case 'humidity':
+                    chartConfig.data.datasets = [{
+                        label: 'Humidity (%)',
+                        data: [65, 68, 62, 70, 72, 68, 66],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }];
+                    break;
+                case 'airquality':
+                    chartConfig.type = 'bar';
+                    chartConfig.data.datasets = [{
+                        label: 'Air Quality (ppm)',
+                        data: [45, 52, 38, 65, 42, 55, 48],
+                        backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                        borderColor: 'rgb(34, 197, 94)',
+                        borderWidth: 2
+                    }];
+                    break;
+                case 'correlation':
+                    chartConfig.type = 'scatter';
+                    chartConfig.data.datasets = [{
+                        label: 'Temp vs Humidity',
+                        data: generateRandomData(30, 20, 30, 40, 80),
+                        backgroundColor: 'rgba(251, 146, 60, 0.6)',
+                        borderColor: 'rgb(251, 146, 60)'
+                    }];
+                    chartConfig.options.scales.x.title = { display: true, text: 'Suhu (\u00B0C)', color: 'rgba(255, 255, 255, 0.9)' };
+                    chartConfig.options.scales.y.title = { display: true, text: 'Humidity (%)', color: 'rgba(255, 255, 255, 0.9)' };
+                    break;
+            }
+            
+            window.advancedChartInstance = new Chart(ctx.getContext('2d'), chartConfig);
+        }
+        
+        async function loadEsp32Config() {
+            try {
+                const resp = await fetch(apiUrl('/api/esp32/config'));
+                if (!resp.ok) return;
+                const cfg = await resp.json();
+                if (!cfg || typeof cfg !== 'object') return;
+
+                // Map a few compatible fields into the UI (best-effort)
+                const rf = document.getElementById('readingFrequency');
+                const sensorInterval = Number(cfg.sensor_interval);
+                if (rf && Number.isFinite(sensorInterval)) {
+                    const option = Array.from(rf.options).find(o => Number(o.value) === sensorInterval);
+                    if (option) rf.value = option.value;
+                }
+
+                const calib = cfg.calibration_values || {};
+                const tempCalibration = document.getElementById('tempCalibration');
+                if (tempCalibration && Number.isFinite(Number(calib.temperature))) {
+                    tempCalibration.value = String(Number(calib.temperature));
+                }
+            } catch (err) {
+                console.warn('loadEsp32Config failed:', err);
+            }
+        }
+
+        async function saveEsp32Config() {
+            // Save a minimal compatible ESP32 config to backend (esp32_config.json)
+            const rf = document.getElementById('readingFrequency');
+            const tempCalibration = document.getElementById('tempCalibration');
+
+            const sensorInterval = Math.max(1, Math.min(60, parseInt(rf?.value || '5', 10) || 5));
+            const tempCal = parseFloat(tempCalibration?.value || '0') || 0;
+
+            const payload = {
+                sensor_interval: sensorInterval,
+                selected_sensors: {
+                    temperature: true,
+                    humidity: true,
+                    air_quality: true,
+                    light_intensity: true,
+                    gps_latitude: true,
+                    gps_longitude: true,
+                    current: true,
+                    voltage: true,
+                    power: true,
+                    battery_voltage: true
+                },
+                calibration_values: {
+                    temperature: tempCal,
+                    humidity: 0.0,
+                    air_quality: 0,
+                    light_intensity: 0,
+                    gps_latitude: 0.0,
+                    gps_longitude: 0.0,
+                    current: 0.0,
+                    voltage: 0.0,
+                    power: 0.0,
+                    battery_voltage: 0.0
+                }
+            };
+
+            const resp = await fetch(apiUrl('/api/esp32/config'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                const msg = await resp.text().catch(() => '');
+                throw new Error(`ESP32 config HTTP ${resp.status}: ${msg}`);
+            }
+            return resp.json().catch(() => ({}));
+        }
+
+        function showDeviceConfigStatus(message, type = 'info') {
+            const statusEl = document.getElementById('deviceConfigStatus');
+            if (!statusEl) return;
+            statusEl.classList.remove('hidden', 'bg-green-500/20', 'bg-red-500/20', 'bg-blue-500/20', 'bg-yellow-500/20', 'text-green-300', 'text-red-300', 'text-blue-300', 'text-yellow-300');
+            const colors = {
+                success: ['bg-green-500/20', 'text-green-300'],
+                error: ['bg-red-500/20', 'text-red-300'],
+                info: ['bg-blue-500/20', 'text-blue-300'],
+                warning: ['bg-yellow-500/20', 'text-yellow-300']
+            };
+            const [bg, text] = colors[type] || colors.info;
+            statusEl.classList.add(bg, text);
+            statusEl.textContent = message;
+        }
+
+        function hideDeviceConfigStatus() {
+            const statusEl = document.getElementById('deviceConfigStatus');
+            if (statusEl) statusEl.classList.add('hidden');
+        }
+
+        function getDeviceConfigPayload() {
+            const deviceId = (document.getElementById('deviceIdInput')?.value || '').trim();
+            const sensorInterval = Math.max(1, Math.min(60, parseInt(document.getElementById('deviceSensorInterval')?.value || '5', 10) || 5));
+
+            const selectedSensors = {
+                temperature: document.getElementById('devSensorTemperature')?.checked ?? true,
+                humidity: document.getElementById('devSensorHumidity')?.checked ?? true,
+                air_quality: document.getElementById('devSensorAirQuality')?.checked ?? true,
+                light_intensity: document.getElementById('devSensorLight')?.checked ?? true,
+                battery_voltage: document.getElementById('devSensorBattery')?.checked ?? true,
+                gps_latitude: document.getElementById('devSensorGps')?.checked ?? false,
+                gps_longitude: document.getElementById('devSensorGps')?.checked ?? false,
+                current: document.getElementById('devSensorCurrent')?.checked ?? true,
+                voltage: document.getElementById('devSensorBattery')?.checked ?? true,
+                power: document.getElementById('devSensorPower')?.checked ?? true
+            };
+
+            let calibrationValues = {};
+            const calibJson = (document.getElementById('devCalibrationJson')?.value || '').trim();
+            if (calibJson) {
+                try {
+                    calibrationValues = JSON.parse(calibJson);
+                } catch (e) {
+                    throw new Error('Format JSON kalibrasi tidak valid');
+                }
+            }
+
+            return { deviceId, sensorInterval, selectedSensors, calibrationValues };
+        }
+
+        async function pushDeviceConfig() {
+            hideDeviceConfigStatus();
+            let deviceId;
+            try {
+                const cfg = getDeviceConfigPayload();
+                deviceId = cfg.deviceId;
+                if (!deviceId) {
+                    showDeviceConfigStatus('Device ID wajib diisi', 'error');
+                    return;
+                }
+
+                showDeviceConfigStatus('Mengirim konfigurasi...', 'info');
+
+                const payload = {
+                    sensor_interval: cfg.sensorInterval,
+                    selected_sensors: cfg.selectedSensors,
+                    calibration_values: cfg.calibrationValues
+                };
+
+                const resp = await fetch(apiUrl(`/api/devices/${encodeURIComponent(deviceId)}/config`), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resp.ok) {
+                    const msg = await resp.text().catch(() => '');
+                    throw new Error(msg || `HTTP ${resp.status}`);
+                }
+
+                const result = await resp.json().catch(() => ({}));
+                const cmdId = result.command_id || '-';
+                document.getElementById('deviceLastCommandId').value = cmdId;
+                showDeviceConfigStatus(`Konfigurasi terkirim! Command ID: ${cmdId}`, 'success');
+                showToast('Konfigurasi berhasil dikirim ke antrian perangkat', 'success');
+            } catch (err) {
+                console.error('pushDeviceConfig error:', err);
+                showDeviceConfigStatus(`Gagal mengirim: ${err.message}`, 'error');
+                showToast(`Gagal mengirim konfigurasi: ${err.message}`, 'error');
+            }
+        }
+
+        async function loadDeviceCommandPreview() {
+            hideDeviceConfigStatus();
+            const deviceId = (document.getElementById('deviceIdInput')?.value || '').trim();
+            if (!deviceId) {
+                showDeviceConfigStatus('Masukkan Device ID terlebih dahulu', 'warning');
+                return;
+            }
+
+            showDeviceConfigStatus('Mengambil perintah...', 'info');
+
+            try {
+                const resp = await fetch(apiUrl(`/api/devices/${encodeURIComponent(deviceId)}/commands`));
+                if (!resp.ok) {
+                    const msg = await resp.text().catch(() => '');
+                    throw new Error(msg || `HTTP ${resp.status}`);
+                }
+
+                const data = await resp.json().catch(() => ({}));
+                if (data.command === 'no_command') {
+                    showDeviceConfigStatus('Tidak ada perintah pending untuk perangkat ini', 'info');
+                } else {
+                    const cmdId = data.command_id || '-';
+                    document.getElementById('deviceLastCommandId').value = cmdId;
+                    showDeviceConfigStatus(`Perintah pending: ${data.command} (ID: ${cmdId})`, 'success');
+
+                    // Populate form with pending config if available
+                    if (data.payload) {
+                        if (data.payload.sensor_interval) {
+                            document.getElementById('deviceSensorInterval').value = data.payload.sensor_interval;
+                        }
+                        if (data.payload.calibration_values) {
+                            document.getElementById('devCalibrationJson').value = JSON.stringify(data.payload.calibration_values, null, 2);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('loadDeviceCommandPreview error:', err);
+                showDeviceConfigStatus(`Gagal mengambil perintah: ${err.message}`, 'error');
+            }
+        }
+
+        async function saveConfig() {
+            const config = {
+                tempUnit: document.getElementById('tempUnit').value,
+                tempCalibration: document.getElementById('tempCalibration').value,
+                readingFrequency: document.getElementById('readingFrequency').value,
+                serverUrl: document.getElementById('serverUrl').value,
+                timeout: document.getElementById('timeout').value
+            };
+            
+            localStorage.setItem('weatherConfig', JSON.stringify(config));
+            
+            try {
+                await saveEsp32Config();
+                showToast('Configuration saved & ESP32 updated', 'success');
+            } catch (err) {
+                console.error('Failed to save ESP32 config', err);
+                showToast('Konfigurasi tersimpan (ESP32 config gagal dikirim)', 'warning');
+            }
+        }
+        
+        function resetConfig() {
+            if (confirm('Are you sure you want to reset all settings to default?')) {
+                localStorage.removeItem('weatherConfig');
+                location.reload();
+            }
+        }
+        
+        function clearOldData() {
+            if (confirm('Are you sure you want to clear old data? This action cannot be undone.')) {
+                showToast('Clearing old data...', 'info');
+                fetch(apiUrl('/api/backup'), { method: 'POST' })
+                    .then(res => {
+                        if (!res.ok) {
+                            return res.json().then(data => Promise.reject(data));
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            showToast('Old data cleared successfully', 'success');
+                        } else {
+                            showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                        updateDataStats();
+                    })
+                    .catch(err => {
+                        const errMsg = err.error || err.message || 'Unknown error';
+                        showToast('Error clearing data: ' + errMsg, 'error');
+                    });
+            }
+        }
+        
+        function createBackup() {
+            showToast('Creating backup...', 'info');
+            fetch(apiUrl('/api/backup'), { method: 'POST' })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(data => Promise.reject(data));
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === 'ok') {
+                        const backupTime = new Date().toISOString();
+                        localStorage.setItem('lastBackupTime', backupTime);
+                        const lastBackupEl = document.getElementById('lastBackup');
+                        if (lastBackupEl) {
+                            lastBackupEl.textContent = new Date(backupTime).toLocaleString();
+                        }
+                        showToast('Backup created successfully: ' + (data.message || data.backup_file), 'success');
+                        updateDataStats();
+                    } else {
+                        showToast('Backup creation failed: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(err => {
+                    const errMsg = typeof err === 'string' ? err : (err.error || err.message || 'Unknown error');
+                    console.error('Backup error:', err);
+                    showToast('Error creating backup: ' + errMsg, 'error');
+                });
+        }
+        
+        function restoreBackup() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    showToast('Restoring backup...', 'info');
+                    fetch(apiUrl('/api/restore'), { method: 'POST' })
+                        .then(res => {
+                            if (!res.ok) {
+                                return res.json().then(data => Promise.reject(data));
+                            }
+                            return res.json();
+                        })
+                        .then(data => {
+                            if (data.status === 'ok') {
+                                showToast('Backup restored successfully: ' + data.message, 'success');
+                                updateDataStats();
+                            } else {
+                                showToast('Restore failed: ' + (data.error || 'Unknown error'), 'error');
+                            }
+                        })
+                        .catch(err => {
+                            const errMsg = err.error || err.message || 'Unknown error';
+                            showToast('Error restoring backup: ' + errMsg, 'error');
+                        });
+                }
+            };
+            input.click();
+        }
+        
+        function downloadExport() {
+            const format = document.getElementById('exportFormat').value;
+            const dataType = document.getElementById('dataType').value;
+            const startDate = document.getElementById('startDate').value || '';
+            const endDate = document.getElementById('endDate').value || '';
+            
+            showToast(`Preparing ${format.toUpperCase()} export...`, 'info');
+            
+            // Fetch data dari API
+            fetch(apiUrl('/api/historical-data?limit=10000'))
+                .then(res => res.json())
+                .then(response => {
+                    let data = response.data || [];
+                    if (typeof data === 'object' && !Array.isArray(data)) {
+                        data = Object.values(data);
+                    }
+                    
+                    // Filter by date range if provided
+                    if (startDate || endDate) {
+                        const start = startDate ? new Date(startDate) : new Date(0);
+                        const end = endDate ? new Date(endDate) : new Date();
+                        data = data.filter(item => {
+                            const itemDate = new Date(item.timestamp);
+                            return itemDate >= start && itemDate <= end;
+                        });
+                    }
+                    
+                    // Filter by data type
+                    if (dataType === 'sensors') {
+                        data = data.filter(item => item.temperature !== undefined);
+                    } else if (dataType === 'predictions') {
+                        data = data.filter(item => item.weather_type !== undefined && item.rain_probability !== undefined);
+                    }
+                    
+                    let content = '';
+                    let mimeType = 'text/plain';
+                    let fileExt = 'txt';
+                    
+                    if (format === 'csv') {
+                        content = convertToCSV(data);
+                        mimeType = 'text/csv';
+                        fileExt = 'csv';
+                    } else if (format === 'json') {
+                        content = JSON.stringify(data, null, 2);
+                        mimeType = 'application/json';
+                        fileExt = 'json';
+                    } else if (format === 'excel') {
+                        content = convertToCSV(data);
+                        mimeType = 'text/csv';
+                        fileExt = 'csv';
+                    }
+                    
+                    // Buat blob dan download
+                    const blob = new Blob([content], { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `weather-data-${new Date().toISOString().split('T')[0]}.${fileExt}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    showToast(`Export downloaded successfully as ${fileExt.toUpperCase()}`, 'success');
+                })
+                .catch(err => {
+                    console.error('Export error:', err);
+                    showToast('Failed to export data', 'error');
+                });
+        }
+        
+        function convertToCSV(data) {
+            if (!data || data.length === 0) {
+                return 'No data available';
+            }
+            
+            // Get all unique keys from data
+            const keys = new Set();
+            data.forEach(item => {
+                Object.keys(item).forEach(key => keys.add(key));
+            });
+            const headers = Array.from(keys);
+            
+            // Create CSV header
+            let csv = headers.join(',') + '\n';
+            
+            // Add data rows
+            data.forEach(item => {
+                const row = headers.map(header => {
+                    const value = item[header];
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    // Escape quotes and wrap in quotes if contains comma
+                    const stringValue = String(value).replace(/"/g, '""');
+                    return stringValue.includes(',') ? `"${stringValue}"` : stringValue;
+                });
+                csv += row.join(',') + '\n';
+            });
+            
+            return csv;
+        }
+        
+        function previewExport() {
+            const format = document.getElementById('exportFormat').value;
+            showToast(`Preview for ${format.toUpperCase()} format`, 'info');
+        }
+        
+        function refreshLogs() {
+            loadLogs(true);
+        }
+        
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                fetch(apiUrl('/api/logs'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'clear' })
+                })
+                .then(() => {
+                    document.getElementById('logContainer').innerHTML = '<div>Logs cleared...</div>';
+                    showToast('Logs cleared', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to clear logs', 'error');
+                });
+            }
+        }
+        
+        function downloadLogs() {
+            fetch(apiUrl('/api/logs'))
+                .then(async res => {
+                    if (!res.ok) {
+                        const msg = await res.text().catch(() => '');
+                        throw new Error(`HTTP ${res.status} ${msg}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    const logs = (data.logs || []).join('');
+                    const blob = new Blob([logs], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'system-logs.txt';
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Logs downloaded successfully', 'success');
+                })
+                .catch(() => showToast('Failed to download logs', 'error'));
+        }
+        
+        function loadLogs(showToastOnSuccess = false) {
+            const logContainer = document.getElementById('logContainer');
+            const levelSelect = document.getElementById('logLevel');
+            const selectedLevel = (levelSelect?.value || 'all').toLowerCase();
+            
+            fetch(apiUrl('/api/logs'))
+                .then(async res => {
+                    if (!res.ok) {
+                        const msg = await res.text().catch(() => '');
+                        throw new Error(`HTTP ${res.status} ${msg}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    const logs = Array.isArray(data.logs) ? data.logs : [];
+                    const filtered = logs.filter(line => {
+                        if (selectedLevel === 'all') return true;
+                        return line.toLowerCase().includes(selectedLevel);
+                    });
+                    if (!filtered.length) {
+                        logContainer.innerHTML = '<div class="text-gray-400">No logs available.</div>';
+                        return;
+                    }
+                    logContainer.innerHTML = filtered
+                        .map(log => `<div>${log.replace(/</g, '&lt;')}</div>`)
+                        .join('');
+                    if (showToastOnSuccess) showToast('Logs refreshed', 'success');
+                })
+                .catch(err => {
+                    logContainer.innerHTML = `<div class="text-red-300">Failed to load logs: ${err.message || ''}</div>`;
+                    if (showToastOnSuccess) showToast('Failed to load logs', 'error');
+                });
+        }
+        
+        function initAdvancedCharts() {
+            // This function is deprecated - using updateAdvancedChart instead
+            console.log('Advanced charts initialized through updateAdvancedChart');
+        }
+        
+        function generateRandomData(count, minX, maxX, minY, maxY) {
+            const data = [];
+            for (let i = 0; i < count; i++) {
+                data.push({
+                    x: Math.random() * (maxX - minX) + minX,
+                    y: Math.random() * (maxY - minY) + minY
+                });
+            }
+            return data;
+        }
+        
+        function updateDataStats() {
+            // Fetch dashboard stats from backend
+            fetch(apiUrl('/api/dashboard-stats'))
+                .then(res => res.json())
+                .then(data => {
+                    // Update total records
+                    const totalDataEl = document.getElementById('totalDataRecords');
+                    if (totalDataEl && data.total_readings !== undefined) {
+                        totalDataEl.textContent = data.total_readings.toLocaleString();
+                    }
+                    
+                    // Calculate and update database size
+                    const dbSizeEl = document.getElementById('databaseSize');
+                    if (dbSizeEl && data.total_readings && data.last_reading) {
+                        // Rough estimation: ~1KB per reading
+                        const estimatedSizeMB = Math.max(0.1, (data.total_readings * 1.2) / 1024).toFixed(2);
+                        dbSizeEl.textContent = estimatedSizeMB + ' MB';
+                    } else if (dbSizeEl) {
+                        dbSizeEl.textContent = '0.1 MB';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching data stats:', err);
+                    // Set defaults if fetch fails
+                    const totalDataEl = document.getElementById('totalDataRecords');
+                    const dbSizeEl = document.getElementById('databaseSize');
+                    if (totalDataEl && !totalDataEl.textContent.trim()) totalDataEl.textContent = '0';
+                    if (dbSizeEl && !dbSizeEl.textContent.trim()) dbSizeEl.textContent = '0 MB';
+                });
+            
+            // Check last backup time from local storage
+            const lastBackupEl = document.getElementById('lastBackup');
+            if (lastBackupEl) {
+                const lastBackupTime = localStorage.getItem('lastBackupTime');
+                if (lastBackupTime) {
+                    try {
+                        const backupDate = new Date(lastBackupTime);
+                        lastBackupEl.textContent = backupDate.toLocaleString();
+                    } catch (e) {
+                        lastBackupEl.textContent = 'Unknown';
+                    }
+                } else {
+                    lastBackupEl.textContent = 'Never';
+                }
+            }
+        }
+        
+        // Initialize dashboard on load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved configuration
+            loadSavedConfig();
+            loadEsp32Config();
+            loadClientSettingsFromInputs();
+            applyClientSettingsToUI();
+            updateAppHeaderHeight();
+            startStatusPolling();
+            const intervalInput = document.getElementById('updateInterval');
+            if (intervalInput) {
+                intervalInput.addEventListener('change', handleUpdateIntervalChange);
+                intervalInput.addEventListener('blur', handleUpdateIntervalChange);
+            }
+
+            initSidebarState(true);
+            requestAnimationFrame(() => {
+                document.body.classList.add('app-ready');
+            });
+            window.addEventListener('resize', () => {
+                initSidebarState(false);
+                updateAppHeaderHeight();
+            });
+            
+            // Initialize components with delay to prevent connection errors
+	            setTimeout(() => {
+	                initializeSocketIO();
+	                initCharts();
+	                loadFirebaseStatus();
+	                fetchInitialData();
+	                restartDataTimer();
+	                updateAppHeaderHeight();
+	            }, 500);
+            
+            // Initialize data stats
+            updateDataStats();
+            
+            // Set current date for export inputs
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').value = today;
+            document.getElementById('endDate').value = today;
+        });
+        
+        function loadSavedConfig() {
+            const savedConfig = localStorage.getItem('weatherConfig');
+            if (savedConfig) {
+                const config = JSON.parse(savedConfig);
+                
+                // Apply saved configuration
+                if (config.tempUnit) document.getElementById('tempUnit').value = config.tempUnit;
+                if (config.tempCalibration) document.getElementById('tempCalibration').value = config.tempCalibration;
+                if (config.readingFrequency) document.getElementById('readingFrequency').value = config.readingFrequency;
+                if (config.serverUrl) document.getElementById('serverUrl').value = config.serverUrl;
+                if (config.timeout) document.getElementById('timeout').value = config.timeout;
+            }
+        }
+        
+        // Initialize Socket.IO
+        function initializeSocketIO() {
+            try {
+                // Gunakan origin yang sama dengan dashboard (tanpa hardcode IP)
+                
+                console.log('Menghubungkan Socket.IO...');
+                
+                const socket = io({
+                    path: '/socket.io',
+                    transports: ['websocket', 'polling'],
+                    timeout: 10000,
+                    forceNew: true,
+                    reconnectionDelayMax: 5000
+                });
+                
+                socket.on('connect', function() {
+                    console.log('?. Socket.IO connected');
+                    socketConnected = true;
+                    updateStatusIndicators({
+                        server_connected: true
+                    });
+                });
+                
+                socket.on('disconnect', function() {
+                    console.log('??O Socket.IO disconnected');
+                    socketConnected = false;
+                    const sidebarServerStatus = document.getElementById('sidebarServerStatus');
+                    if (sidebarServerStatus) sidebarServerStatus.textContent = 'Disconnected';
+                    updateStatusIndicators({ server_connected: false });
+                    fetchStatusUpdate();
+                });
+                
+                socket.on('sensor_update', function(data) {
+                    console.log('ðŸ“¡ Real-time sensor update:', data);
+                    scheduleUiUpdate(data);
+                });
+                
+                socket.on('status_update', function(data) {
+                    console.log('ðŸ“Š Status update:', data);
+                    updateStatusIndicators(data);
+                });
+                
+                socket.on('connect_error', function(error) {
+                    console.error('??O Socket connection error:', error);
+                    socketConnected = false;
+                    const sidebarServerStatus = document.getElementById('sidebarServerStatus');
+                    if (sidebarServerStatus) sidebarServerStatus.textContent = 'Disconnected';
+                    updateStatusIndicators({ server_connected: false });
+                    fetchStatusUpdate();
+                });
+                
+            } catch (error) {
+                console.error('âŒ Failed to initialize Socket.IO:', error);
+                // Don't show toast on initialization error to prevent spam
+            }
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Temperature Chart
+            const tempCtx = document.getElementById('tempChart');
+            if (tempCtx) {
+                tempChart = new Chart(tempCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'Suhu (\u00B0C)',
+                            data: temperatureData,
+                            borderColor: 'rgb(251, 146, 60)',
+                            backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: false,
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                            },
+	                            x: {
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)', autoSkip: true, maxTicksLimit: 6, maxRotation: 0, minRotation: 0 }
+	                            }
+	                        }
+	                    }
+	                });
+	            }
+
+            // Humidity Chart
+            const humCtx = document.getElementById('humidityChart');
+	            if (humCtx) {
+	                humidityChart = new Chart(humCtx.getContext('2d'), {
+	                    type: 'line',
+	                    data: {
+	                        labels: chartLabels,
+	                        datasets: [{
+	                            label: 'Kelembapan (%)',
+	                            data: humidityData,
+	                            borderColor: 'rgb(59, 130, 246)',
+	                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+	                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: false,
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                            },
+	                            x: {
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)', autoSkip: true, maxTicksLimit: 6, maxRotation: 0, minRotation: 0 }
+	                            }
+	                        }
+	                    }
+	                });
+	            }
+
+	            // Air Quality Chart
+	            const airCtx = document.getElementById('airQualityChart');
+	            if (airCtx) {
+	                airChart = new Chart(airCtx.getContext('2d'), {
+	                    type: 'line',
+	                    data: {
+	                        labels: chartLabels,
+	                        datasets: [{
+	                            label: 'Kualitas Udara (ppm)',
+	                            data: airQualityData,
+	                            borderColor: 'rgb(34, 197, 94)',
+	                            backgroundColor: 'rgba(34, 197, 94, 0.12)',
+	                            borderWidth: 2,
+	                            tension: 0.35,
+	                            fill: true,
+	                            pointRadius: 3,
+	                            pointHoverRadius: 5
+	                        }]
+	                    },
+	                    options: {
+	                        responsive: true,
+	                        maintainAspectRatio: false,
+	                        animation: { duration: 0 },
+	                        interaction: { intersect: false, mode: 'index' },
+	                        plugins: {
+	                            legend: { display: false }
+	                        },
+	                        scales: {
+	                            y: {
+	                                beginAtZero: true,
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+	                            },
+	                            x: { 
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)', autoSkip: true, maxTicksLimit: 6, maxRotation: 0, minRotation: 0 }
+	                            }
+	                        }
+	                    }
+	                });
+	            }
+
+	            // Light Intensity Chart
+	            const lightCtx = document.getElementById('lightChart');
+	            if (lightCtx) {
+	                lightChart = new Chart(lightCtx.getContext('2d'), {
+	                    type: 'line',
+	                    data: {
+	                        labels: chartLabels,
+	                        datasets: [{
+	                            label: 'Intensitas Cahaya (lux)',
+	                            data: lightIntensityData,
+	                            borderColor: 'rgb(250, 204, 21)',
+	                            backgroundColor: 'rgba(250, 204, 21, 0.10)',
+	                            borderWidth: 2,
+	                            tension: 0.35,
+	                            fill: true,
+	                            pointRadius: 3,
+	                            pointHoverRadius: 5
+	                        }]
+	                    },
+	                    options: {
+	                        responsive: true,
+	                        maintainAspectRatio: false,
+	                        animation: { duration: 0 },
+	                        interaction: { intersect: false, mode: 'index' },
+	                        plugins: {
+	                            legend: { display: false }
+	                        },
+	                        scales: {
+	                            y: {
+	                                beginAtZero: true,
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+	                            },
+	                            x: { 
+	                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+	                                ticks: { color: 'rgba(255, 255, 255, 0.7)', autoSkip: true, maxTicksLimit: 6, maxRotation: 0, minRotation: 0 }
+	                            }
+	                        }
+	                    }
+	                });
+	            }
+	        }
+        
+        // Update charts with new data
+	        function updateCharts(data) {
+	            if (!data) return;
+	            
+	            // Support both {temperature, humidity} and {last_reading: {...}}
+	            const reading = data.last_reading || data;
+	            if (
+	                reading.temperature === undefined &&
+	                reading.humidity === undefined &&
+	                reading.air_quality === undefined &&
+	                reading.light_intensity === undefined
+	            ) return;
+
+            const tsSource = reading.timestamp ? new Date(reading.timestamp) : new Date();
+            const timestamp = isNaN(tsSource.getTime()) ? new Date().toLocaleTimeString() : tsSource.toLocaleTimeString();
+            
+	            // Add new data
+	            chartLabels.push(timestamp);
+	            const t = Number(reading.temperature);
+	            const h = Number(reading.humidity);
+	            const aq = Number(reading.air_quality);
+	            const lx = Number(reading.light_intensity);
+	            temperatureData.push(Number.isFinite(t) ? t : null);
+	            humidityData.push(Number.isFinite(h) ? h : null);
+	            airQualityData.push(Number.isFinite(aq) ? aq : null);
+	            lightIntensityData.push(Number.isFinite(lx) ? lx : null);
+	            
+	            // Keep only last 20 data points
+	            if (chartLabels.length > 20) {
+	                chartLabels.shift();
+	                temperatureData.shift();
+	                humidityData.shift();
+	                airQualityData.shift();
+	                lightIntensityData.shift();
+	            }
+            
+            // Update temperature chart
+            if (tempChart) {
+                tempChart.data.labels = [...chartLabels];
+                tempChart.data.datasets[0].data = [...temperatureData];
+                tempChart.update('none');
+            }
+            
+	            // Update humidity chart
+	            if (humidityChart) {
+	                humidityChart.data.labels = [...chartLabels];
+	                humidityChart.data.datasets[0].data = [...humidityData];
+	                humidityChart.update('none');
+	            }
+
+	            // Update air quality chart
+	            if (airChart) {
+	                airChart.data.labels = [...chartLabels];
+	                airChart.data.datasets[0].data = [...airQualityData];
+	                airChart.update('none');
+	            }
+
+	            // Update light intensity chart
+	            if (lightChart) {
+	                lightChart.data.labels = [...chartLabels];
+	                lightChart.data.datasets[0].data = [...lightIntensityData];
+	                lightChart.update('none');
+	            }
+	        }
+        
+        // Enhanced dashboard update
+        function updateDashboardEnhanced(data) {
+            // Handle dashboard-stats response format
+            const sensorData = data.last_reading || data;
+            
+            // Update 4 main metric cards (value + badge + gauge)
+            updateMetricCards(sensorData);
+            
+            // Update battery information
+            updateBatteryInfo(sensorData);
+            
+            // Update GPS location
+            updateLocationInfo(sensorData);
+            
+            // Update data management stats
+            updateDataStats();
+            
+            // Update status indicators only once, not on every sensor update
+            updateStatusIndicators({
+                firebase_connected: data.firebase_available || false,
+                last_update: sensorData.timestamp || new Date().toISOString(),
+                data_source: data.data_source || 'Lokal',
+                esp32_connected: sensorData.device_id ? true : false,
+                server_connected: true
+            });
+            
+            // Update prediction if available
+            if (data.last_prediction) {
+                updatePredictionDisplay(data.last_prediction, sensorData);
+            }
+
+            // Show and enhance evaluation banner with summary + model provenance
+            try {
+                // Prefer evaluation_summary from API, fallback to last_metrics to remain compatible with older deployments
+                const evalSummary = data.evaluation_summary || (data.last_metrics ? {
+                    mode: data.last_metrics.evaluation_mode || data.evaluation_mode || 'UNKNOWN',
+                    trusted: !!data.last_metrics.metrics_trusted,
+                    warnings: data.last_metrics.warnings || [],
+                    synthetic_used: !!data.last_metrics.synthetic_used,
+                    train_counts: data.last_metrics.train_counts || {},
+                    test_counts: data.last_metrics.test_counts || {},
+                    test_accuracy: data.last_metrics.test_accuracy,
+                    macro_f1: data.last_metrics.macro_f1,
+                    baseline_majority_accuracy: data.last_metrics.baseline_majority_accuracy
+                } : {});
+                const badge = data.evaluation_badge || { text: (data.evaluation_mode || evalSummary.mode || 'UNKNOWN'), class: (data.evaluation_mode === 'VALID' || evalSummary.mode === 'VALID') ? 'badge-valid' : 'badge-nonvalid' };
+                const bannerEl = document.getElementById('ai-metrics-banner');
+                const modelMetaEl = document.getElementById('ai-model-meta');
+
+                if (bannerEl) {
+                    const trusted = evalSummary.trusted === true;
+                    // Determine badge text and class (prefer server-provided `evaluation_badge`)
+                    const badgeText = (data.evaluation_badge && data.evaluation_badge.text) || (evalSummary.mode || 'UNKNOWN');
+                    let badgeClass = 'metric-badge ';
+                    if (data.evaluation_badge && data.evaluation_badge.class) {
+                        badgeClass += data.evaluation_badge.class;
+                    } else {
+                        badgeClass += (evalSummary.mode === 'VALID') ? 'state-good' : 'state-warn';
+                    }
+
+                    // Compact message: if metrics are trusted show latest prediction + confidence, otherwise show warning
+                    let msg;
+                    if (trusted) {
+                        if (data.last_prediction) {
+                            const label = data.last_prediction.weather_type || data.last_prediction.condition || 'N/A';
+                            const conf = Math.round((data.last_prediction.confidence||0)*100);
+                            msg = `${label} • ${conf}%`;
+                        } else {
+                            msg = 'Metrik dipercaya';
+                        }
+                    } else {
+                        msg = 'Metrik tidak representatif';
+                    }
+
+                    // Show banner only if we have an evaluation mode
+                    bannerEl.style.display = evalSummary.mode ? 'block' : 'none';
+                    bannerEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="display:flex;align-items:center">` +
+                        `<span class="${badgeClass}" style="margin-right:8px">${badgeText}</span>` +
+                        `<strong style="color:#fff">Evaluasi AI</strong></div><div style="font-size:13px;color:#cbd5e1">${msg}</div></div>`;
+
+                    // Apply a subtle class-based highlight rather than inlining styles
+                    if (!trusted) {
+                        bannerEl.classList.add('ai-banner-nonvalid');
+                        bannerEl.classList.remove('ai-banner-valid');
+                    } else {
+                        bannerEl.classList.add('ai-banner-valid');
+                        bannerEl.classList.remove('ai-banner-nonvalid');
+                    }
+                }
+
+                if (modelMetaEl) {
+                    if (data.model_meta) {
+                        const mid = data.model_meta.id || data.model_meta.version || '—';
+                        const saved = data.model_meta.saved_at ? new Date(data.model_meta.saved_at).toLocaleString() : (data.model_meta.saved_at || '');
+                        modelMetaEl.textContent = `Model: ${mid} • Saved: ${saved}`;
+                    } else {
+                        modelMetaEl.textContent = '';
+                    }
+                }
+            } catch (e) {
+                console.debug('AI banner render error', e);
+            }
+
+            // Helper: render AI details (for the collapsible panel)
+            function renderAiDetails(data) {
+                const detailsEl = document.getElementById('ai-details-content');
+                if (!detailsEl) return;
+                const lastMetrics = data.last_metrics || {};
+                const evalSummary = data.evaluation_summary || (lastMetrics ? {
+                    mode: lastMetrics.evaluation_mode || data.evaluation_mode || 'UNKNOWN',
+                    trusted: !!lastMetrics.metrics_trusted,
+                    warnings: lastMetrics.warnings || [],
+                    synthetic_used: !!lastMetrics.synthetic_used,
+                    train_counts: lastMetrics.train_counts || {},
+                    test_counts: lastMetrics.test_counts || {},
+                    test_accuracy: lastMetrics.test_accuracy,
+                    macro_f1: lastMetrics.macro_f1,
+                    baseline_majority_accuracy: lastMetrics.baseline_majority_accuracy
+                } : {});
+
+                const parts = [];
+                parts.push(`<div><strong>Evaluasi:</strong> ${evalSummary.mode} • ${evalSummary.trusted ? 'Trusted' : 'Not trusted'}</div>`);
+                if (evalSummary.warnings && evalSummary.warnings.length) parts.push(`<div style="margin-top:6px;color:#fbbf24"><em>${evalSummary.warnings.join('; ')}</em></div>`);
+                parts.push(`<div style="margin-top:8px"><strong>Distribusi (train/test):</strong></div>`);
+                const tableRows = [];
+                const labels = Object.keys(Object.assign({}, evalSummary.train_counts, evalSummary.test_counts));
+                tableRows.push('<table style="width:100%;font-size:13px;border-collapse:collapse">');
+                tableRows.push('<tr><th style="text-align:left;padding:4px 6px">Label</th><th style="text-align:right;padding:4px 6px">Train</th><th style="text-align:right;padding:4px 6px">Test</th></tr>');
+                labels.forEach(lbl => {
+                    const t = evalSummary.train_counts[lbl] || 0;
+                    const tt = evalSummary.test_counts[lbl] || 0;
+                    tableRows.push(`<tr><td style="padding:4px 6px">${lbl}</td><td style="padding:4px 6px;text-align:right">${t}</td><td style="padding:4px 6px;text-align:right">${tt}</td></tr>`);
+                });
+                tableRows.push('</table>');
+                parts.push(tableRows.join(''));
+
+                parts.push(`<div style="margin-top:8px"><strong>Metrics:</strong> Test acc: ${evalSummary.test_accuracy === null ? 'n/a' : Number(evalSummary.test_accuracy).toFixed(3)} • Macro F1: ${evalSummary.macro_f1 === null ? 'n/a' : Number(evalSummary.macro_f1).toFixed(3)} • Baseline: ${evalSummary.baseline_majority_accuracy === null ? 'n/a' : Number(evalSummary.baseline_majority_accuracy).toFixed(3)}</div>`);
+                parts.push(`<div style="margin-top:6px"><strong>Model:</strong> ${data.model_meta ? (data.model_meta.id || data.model_meta.version || data.model_meta.model_path) : '—'}</div>`);
+                parts.push(`<div style="margin-top:6px;color:#9ca3af;font-size:12px">Saved: ${data.model_meta ? (data.model_meta.saved_at || '—') : '—'}</div>`);
+
+                detailsEl.innerHTML = parts.join('');
+            }
+
+            function toggleAiDetails() {
+                const el = document.getElementById('ai-details');
+                if (!el) return;
+                if (el.style.display === 'none') {
+                    el.style.display = 'block';
+                    renderAiDetails(window.lastServerStatus || {});
+                    document.getElementById('ai-details-toggle').querySelector('a').textContent = 'Sembunyikan detail AI ‹';
+                } else {
+                    el.style.display = 'none';
+                    document.getElementById('ai-details-toggle').querySelector('a').textContent = 'Lihat detail AI ›';
+                }
+            }
+            
+            // Update timestamp
+            updateLastUpdateTime(sensorData.timestamp);
+
+            // Populate AI details panel if open
+            try {
+                if (document.getElementById('ai-details').style.display !== 'none') {
+                    renderAiDetails(data);
+                }
+            } catch (e) {}
+            
+            // Update counter
+            updateCounter++;
+            document.getElementById('update-counter').textContent = updateCounter;
+            
+            // Update total records
+            if (data.total_readings) {
+                const totalRecordsEl = document.getElementById('totalRecords');
+                if (totalRecordsEl) totalRecordsEl.textContent = data.total_readings;
+            }
+        }
+
+        function clamp01(value) {
+            if (!Number.isFinite(value)) return 0;
+            return Math.max(0, Math.min(1, value));
+        }
+
+        function setGaugeNeedle(gaugeEl, ratio) {
+            if (!gaugeEl) return;
+            const r = clamp01(ratio);
+            const deg = -90 + (r * 180);
+            gaugeEl.style.setProperty('--gauge-pct', `${r * 100}`);
+            gaugeEl.style.setProperty('--needle-rot', `${deg}deg`);
+        }
+
+        function classifyTemperature(tempC) {
+            if (!Number.isFinite(tempC)) return { label: '--', state: 'state-info' };
+            if (tempC < 18) return { label: 'Dingin', state: 'state-info' };
+            if (tempC < 27) return { label: 'Normal', state: 'state-good' };
+            if (tempC < 33) return { label: 'Hangat', state: 'state-warn' };
+            if (tempC < 37) return { label: 'Panas', state: 'state-warn' };
+            return { label: 'Sangat Panas', state: 'state-bad' };
+        }
+
+        function classifyHumidity(humidity) {
+            if (!Number.isFinite(humidity)) return { label: '--', state: 'state-info' };
+            if (humidity < 40) return { label: 'Kering', state: 'state-warn' };
+            if (humidity < 60) return { label: 'Normal', state: 'state-good' };
+            if (humidity < 75) return { label: 'Lembap', state: 'state-info' };
+            return { label: 'Sangat Lembap', state: 'state-warn' };
+        }
+
+        function classifyAirQuality(ppm) {
+            if (!Number.isFinite(ppm)) return { label: '--', state: 'state-info' };
+            if (ppm <= 100) return { label: 'Bagus', state: 'state-good' };
+            if (ppm <= 200) return { label: 'Normal', state: 'state-warn' };
+            if (ppm <= 400) return { label: 'Buruk', state: 'state-bad' };
+            return { label: 'Sangat Buruk', state: 'state-bad' };
+        }
+
+        function classifyLightLux(lux) {
+            if (!Number.isFinite(lux)) return { label: '--', state: 'state-info' };
+            if (lux < 50) return { label: 'Gelap', state: 'state-warn' };
+            if (lux < 1000) return { label: 'Mendung', state: 'state-warn' };
+            if (lux < 10000) return { label: 'Berawan', state: 'state-info' };
+            if (lux < 50000) return { label: 'Cerah', state: 'state-good' };
+            return { label: 'Terik', state: 'state-warn' };
+        }
+
+        function setBadge(el, classification) {
+            if (!el) return;
+            el.textContent = classification.label;
+            el.className = `metric-badge ${classification.state}`;
+        }
+
+        function updateMetricCards(sensorData) {
+            const t = Number(sensorData.temperature);
+            const h = Number(sensorData.humidity);
+            const aq = Number(sensorData.air_quality);
+            const lx = Number(sensorData.light_intensity);
+
+            // Values
+            updateSensorWithAnimation('temperature', Number.isFinite(t) ? t : undefined, '\u00B0C', 1);
+            updateSensorWithAnimation('humidity', Number.isFinite(h) ? h : undefined, '%', 1);
+            updateSensorWithAnimation('air-quality', Number.isFinite(aq) ? aq : undefined, ' ppm', 0);
+            updateSensorWithAnimation('light-intensity', Number.isFinite(lx) ? lx : undefined, ' lux', 0);
+
+            // Badges
+            setBadge(document.getElementById('temperature-status'), classifyTemperature(t));
+            setBadge(document.getElementById('humidity-status'), classifyHumidity(h));
+            setBadge(document.getElementById('air-quality-status'), classifyAirQuality(aq));
+            setBadge(document.getElementById('light-status'), classifyLightLux(lx));
+
+            // Gauges
+            setGaugeNeedle(document.getElementById('gauge-temperature'), clamp01((t - 0) / 50));
+            setGaugeNeedle(document.getElementById('gauge-humidity'), clamp01(h / 100));
+            setGaugeNeedle(document.getElementById('gauge-air'), clamp01(aq / 500));
+            setGaugeNeedle(document.getElementById('gauge-light'), clamp01(lx / 50000));
+        }
+        
+        function resolveBatteryValue(sensorData, keys) {
+            for (const key of keys) {
+                const raw = sensorData?.[key];
+                if (raw === undefined || raw === null || raw === '') continue;
+                const num = Number(raw);
+                if (!Number.isNaN(num)) return num;
+            }
+            return null;
+        }
+
+        function updateBatteryInfo(sensorData) {
+            // Update battery voltage
+            const voltageElement = document.getElementById('battery-voltage');
+            const voltageValue = resolveBatteryValue(sensorData, ['battery_voltage', 'voltage']);
+            if (voltageElement) {
+                voltageElement.textContent = Number.isFinite(voltageValue) ? `${voltageValue.toFixed(2)} V` : '-- V';
+            }
+            
+            // Update battery current
+            const currentElement = document.getElementById('battery-current');
+            const currentValue = resolveBatteryValue(sensorData, ['battery_current', 'current']);
+            if (currentElement) {
+                currentElement.textContent = currentValue !== null ? `${currentValue} mA` : '-- mA';
+            }
+            
+            // Update battery power
+            const powerElement = document.getElementById('battery-power');
+            const powerValue = resolveBatteryValue(sensorData, ['battery_power', 'power']);
+            if (powerElement) {
+                powerElement.textContent = powerValue !== null ? `${powerValue} mW` : '-- mW';
+            }
+
+            const headerVoltage = document.getElementById('header-battery-voltage');
+            if (headerVoltage) {
+                headerVoltage.textContent = Number.isFinite(voltageValue) ? `${voltageValue.toFixed(2)} V` : '-- V';
+            }
+            const headerCurrent = document.getElementById('header-battery-current');
+            if (headerCurrent) {
+                headerCurrent.textContent = currentValue !== null ? `${currentValue} mA` : '-- mA';
+            }
+            const headerPower = document.getElementById('header-battery-power');
+            if (headerPower) {
+                headerPower.textContent = powerValue !== null ? `${powerValue} mW` : '-- mW';
+            }
+
+            // Update charging status
+            const statusElement = document.getElementById('battery-status');
+            const voltage = voltageValue;
+            const rawPct = sensorData.battery_percentage ?? sensorData.battery_percent ?? sensorData.batteryLevel;
+            const pctFromVoltage = Number.isFinite(voltage) ? clamp01((voltage - 3.0) / (4.2 - 3.0)) * 100 : null;
+            const percent = Number.isFinite(Number(rawPct)) ? Math.max(0, Math.min(100, Number(rawPct))) : (pctFromVoltage ?? null);
+
+            const percentPill = document.getElementById('battery-percent-pill');
+            if (percentPill) {
+                percentPill.textContent = percent === null ? '--%' : `${Math.round(percent)}%`;
+                percentPill.classList.toggle('low', percent !== null && percent <= 20);
+            }
+
+            const headerBatteryPercent = document.getElementById('header-battery-percent');
+            if (headerBatteryPercent) {
+                headerBatteryPercent.textContent = percent === null ? '--%' : `${Math.round(percent)}%`;
+            }
+
+            const iconWrap = document.querySelector('.battery-icon-wrap');
+            const icon = document.getElementById('battery-icon');
+            if (iconWrap) iconWrap.classList.toggle('low', percent !== null && percent <= 20);
+            if (icon) {
+                const p = percent === null ? 100 : percent;
+                const cls =
+                    p <= 10 ? 'fa-battery-empty' :
+                    p <= 30 ? 'fa-battery-quarter' :
+                    p <= 55 ? 'fa-battery-half' :
+                    p <= 80 ? 'fa-battery-three-quarters' :
+                    'fa-battery-full';
+                icon.className = `fas ${cls}`;
+            }
+
+            const isCharging = sensorData.battery_charging === true || (currentValue !== null && currentValue > 0);
+            const bolt = document.getElementById('battery-bolt');
+            if (bolt) bolt.classList.toggle('active', !!isCharging);
+
+            const headerBolt = document.getElementById('header-battery-bolt');
+            if (headerBolt) headerBolt.classList.toggle('hidden', !isCharging);
+
+            const headerIcon = document.getElementById('header-battery-icon');
+            if (headerIcon) {
+                const batteryIconClasses = ['fa-battery-empty','fa-battery-quarter','fa-battery-half','fa-battery-three-quarters','fa-battery-full'];
+                batteryIconClasses.forEach(c => headerIcon.classList.remove(c));
+                const p = percent === null ? 100 : percent;
+                const cls =
+                    p <= 10 ? 'fa-battery-empty' :
+                    p <= 30 ? 'fa-battery-quarter' :
+                    p <= 55 ? 'fa-battery-half' :
+                    p <= 80 ? 'fa-battery-three-quarters' :
+                    'fa-battery-full';
+                headerIcon.classList.add(cls);
+                headerIcon.classList.toggle('text-red-300', percent !== null && percent <= 20);
+                headerIcon.classList.toggle('text-emerald-300', percent === null || percent > 20);
+            }
+
+            if (statusElement) {
+                if (sensorData.battery_voltage === undefined && sensorData.battery_current === undefined) {
+                    statusElement.textContent = '--';
+                } else if (isCharging) {
+                    statusElement.innerHTML = '<i class="fas fa-bolt text-yellow-300"></i> Mengisi daya';
+                } else {
+                    statusElement.innerHTML = '<i class="fas fa-plug-circle-xmark text-gray-300"></i> Tidak mengisi daya';
+                }
+            }
+        }
+        
+        function updateLocationInfo(sensorData) {
+            // Normalize lat/lng keys from various payload shapes
+            const latRaw = sensorData.latitude ?? sensorData.lat ?? sensorData.gps_latitude;
+            const lngRaw = sensorData.longitude ?? sensorData.lng ?? sensorData.gps_longitude;
+            const lat = parseFloat(latRaw);
+            const lng = parseFloat(lngRaw);
+
+            const latElement = document.getElementById('gps-lat');
+            if (latElement) {
+                latElement.textContent = Number.isFinite(lat) ? lat.toFixed(6) : '--';
+            }
+            
+            const lngElement = document.getElementById('gps-lng');
+            if (lngElement) {
+                lngElement.textContent = Number.isFinite(lng) ? lng.toFixed(6) : '--';
+            }
+            
+            // Update location name
+            const locationElement = document.getElementById('gps-location');
+            if (locationElement) {
+                const fallbackText = sensorData.location || '--';
+                locationElement.textContent = fallbackText;
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    locationElement.textContent = 'Mencari alamat...';
+                    resolveAddress(lat, lng)
+                        .then(addr => {
+                            locationElement.textContent = addr || fallbackText || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        })
+                        .catch(() => {
+                            locationElement.textContent = fallbackText || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        });
+                }
+            }
+        }
+        
+        function updateSensorWithAnimation(elementId, value, unit, decimals) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const newValue = value !== undefined ? `${value.toFixed(decimals)}${unit}` : `--${unit}`;
+                if (element.textContent !== newValue) {
+                    element.style.transform = 'scale(1.04)';
+                    element.style.transition = 'transform 0.3s ease';
+                    element.textContent = newValue;
+                    setTimeout(() => {
+                        element.style.transform = 'scale(1)';
+                    }, 300);
+                }
+            }
+        }
+        
+        function updateLastUpdateTime(timestamp) {
+            const timeElement = document.getElementById('last-update');
+            const sidebarTimeElement = document.getElementById('sidebarLastUpdate');
+            
+            const effective = freezeLastUpdate ? (frozenLastUpdateIso || lastUpdateIso) : timestamp;
+            if (!effective) return;
+
+            const date = new Date(effective);
+            if (isNaN(date.getTime())) return;
+
+            lastUpdateIso = effective;
+            const timeString = date.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false });
+            if (timeElement) timeElement.textContent = timeString;
+            if (sidebarTimeElement) sidebarTimeElement.textContent = timeString;
+        }
+        
+	        function updateStatusIndicators(data) {
+            // Honor explicit server_connected=false; only default to true when undefined and socket is up
+            if (data.server_connected === undefined && socketConnected) {
+                data.server_connected = true;
+            }
+
+            // Update ESP32 status
+            const esp32Status = document.getElementById('esp32-connection');
+            if (esp32Status && data.esp32_connected !== undefined) {
+                esp32Status.className = data.esp32_connected ? 
+                    'status-indicator bg-green-500' : 'status-indicator bg-gray-500';
+            }
+            
+            // Update Server status
+            const serverStatus = document.getElementById('server-status');
+            if (serverStatus && data.server_connected !== undefined) {
+                serverStatus.className = data.server_connected ? 
+                    'status-indicator bg-green-500' : 'status-indicator bg-red-500';
+            }
+            
+            // Update sidebar server status
+            const sidebarServerStatus = document.getElementById('sidebarServerStatus');
+            if (sidebarServerStatus && data.server_connected !== undefined) {
+                sidebarServerStatus.textContent = data.server_connected ? 'Connected' : 'Disconnected';
+            }
+            
+	            // Update data source
+		            const dataSource = document.getElementById('data-source');
+		            if (dataSource && data.data_source !== undefined) {
+		                const raw = String(data.data_source ?? '').trim();
+		                const lower = raw.toLowerCase();
+		                dataSource.textContent = lower.includes('firebase') ? 'Firebase' : 'Lokal/Direct';
+		            }
+
+		            if (data.firebase_enabled !== undefined) {
+		                firebaseEnabledState = !!data.firebase_enabled;
+		            }
+		            updateFirebaseToggleButton();
+	            
+	            // Update last update
+	            if (data.last_update) {
+	                updateLastUpdateTime(data.last_update);
+	            }
+        }
+        
+        function formatWibTime(timestamp) {
+            if (!timestamp) return '--.--';
+            const d = new Date(timestamp);
+            if (isNaN(d.getTime())) return '--.--';
+            const parts = new Intl.DateTimeFormat('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).formatToParts(d);
+            const hh = parts.find(p => p.type === 'hour')?.value ?? '--';
+            const mm = parts.find(p => p.type === 'minute')?.value ?? '--';
+            return `${hh}.${mm}`;
+        }
+
+        function iconForWeather(type) {
+            const t = (type || '').toLowerCase();
+            if (t.includes('hujan')) return 'fa-cloud-rain';
+            if (t.includes('mendung')) return 'fa-cloud';
+            if (t.includes('berawan')) return 'fa-cloud-sun';
+            if (t.includes('terik') || t.includes('cerah')) return 'fa-sun';
+            return 'fa-cloud';
+        }
+
+        function updateWeatherTheme(weatherType) {
+            const root = document.documentElement;
+            const type = (weatherType || '').toLowerCase();
+            
+            // Define color palettes for different weather conditions
+            const themes = {
+                hujan: {
+                    primary: '#60a5fa',
+                    secondary: '#3b82f6',
+                    accent: '#93c5fd',
+                    bgStart: '#0f172a',
+                    bgMid: '#1e3a5f',
+                    bgEnd: '#1e40af'
+                },
+                mendung: {
+                    primary: '#94a3b8',
+                    secondary: '#64748b',
+                    accent: '#cbd5e1',
+                    bgStart: '#0f172a',
+                    bgMid: '#1e293b',
+                    bgEnd: '#334155'
+                },
+                cerah: {
+                    primary: '#fbbf24',
+                    secondary: '#f59e0b',
+                    accent: '#fcd34d',
+                    bgStart: '#0f172a',
+                    bgMid: '#1e293b',
+                    bgEnd: '#334155'
+                },
+                berawan: {
+                    primary: '#22d3ee',
+                    secondary: '#06b6d4',
+                    accent: '#67e8f9',
+                    bgStart: '#0f172a',
+                    bgMid: '#164e63',
+                    bgEnd: '#0e7490'
+                },
+                default: {
+                    primary: '#3b82f6',
+                    secondary: '#06b6d4',
+                    accent: '#10b981',
+                    bgStart: '#0f172a',
+                    bgMid: '#1e293b',
+                    bgEnd: '#334155'
+                }
+            };
+            
+            let selectedTheme = themes.default;
+            
+            if (type.includes('hujan')) {
+                selectedTheme = themes.hujan;
+            } else if (type.includes('mendung')) {
+                selectedTheme = themes.mendung;
+            } else if (type.includes('cerah')) {
+                selectedTheme = themes.cerah;
+            } else if (type.includes('berawan')) {
+                selectedTheme = themes.berawan;
+            }
+            
+            // Apply theme colors
+            root.style.setProperty('--theme-primary', selectedTheme.primary);
+            root.style.setProperty('--theme-secondary', selectedTheme.secondary);
+            root.style.setProperty('--theme-accent', selectedTheme.accent);
+            root.style.setProperty('--theme-bg-start', selectedTheme.bgStart);
+            root.style.setProperty('--theme-bg-mid', selectedTheme.bgMid);
+            root.style.setProperty('--theme-bg-end', selectedTheme.bgEnd);
+        }
+
+        function updatePredictionDisplay(prediction, sensorData) {
+            if (!prediction) return;
+
+            const nowType = prediction.weather_type || prediction.condition || '--';
+            const nowTemp = Number(sensorData?.temperature);
+            const nowHum = Number(sensorData?.humidity);
+            const nowProb = Number(prediction.rain_probability);
+            const nowConf = Number(prediction.confidence);
+
+            // Update weather theme based on prediction
+            updateWeatherTheme(nowType);
+
+            const elTemp = document.getElementById('ai-now-temp');
+            const elType = document.getElementById('ai-now-type');
+            const elSub = document.getElementById('ai-now-sub');
+            const elReco = document.getElementById('ai-recommendation');
+            const elRain = document.getElementById('ai-rain-time');
+            const elRow = document.getElementById('ai-forecast-row');
+
+            if (elTemp) elTemp.textContent = Number.isFinite(nowTemp) ? `${Math.round(nowTemp)}\u00B0` : '--\u00B0';
+            if (elType) elType.textContent = nowType;
+            if (elSub) elSub.textContent = `Kelembapan ${Number.isFinite(nowHum) ? `${Math.round(nowHum)}%` : '--%'}`;
+            // Simplify recommendation: prefer concise primary_recommendation and show confidence badge
+            if (elReco) {
+                const rec = prediction.primary_recommendation || prediction.recommendation || prediction.recommendations?.[0] || 'Pantau kondisi cuaca';
+                elReco.textContent = rec;
+                // attach a compact confidence badge
+                let confEl = document.getElementById('ai-reco-confidence');
+                if (!confEl) {
+                    confEl = document.createElement('span');
+                    confEl.id = 'ai-reco-confidence';
+                    confEl.className = 'metric-badge state-info';
+                    const recoContainer = document.querySelector('.ai-reco-container');
+                    if (recoContainer) {
+                        recoContainer.appendChild(confEl);
+                    }
+                }
+                confEl.textContent = `Kepercayaan: ${Number.isFinite(nowConf) ? Math.round(nowConf*100) + '%' : '—'}`;
+            }
+
+            if (elRain) {
+                if (prediction.predicted_rain_time) {
+                    elRain.textContent = `Hujan diperkirakan ${formatWibTime(prediction.predicted_rain_time)}.`;
+                } else if (Number.isFinite(nowProb) && nowProb >= 60) {
+                    elRain.textContent = 'Potensi hujan tinggi saat ini.';
+                } else {
+                    elRain.textContent = 'Tidak ada hujan dalam 3 jam ke depan.';
+                }
+            }
+
+            if (elRow) {
+                const hours = Array.isArray(prediction.hourly_forecast) ? prediction.hourly_forecast.slice(0, 3) : [];
+                const nowCard = {
+                    timeLabel: 'Sekarang',
+                    type: nowType,
+                    prob: Number.isFinite(nowProb) ? nowProb : 0,
+                    conf: Number.isFinite(nowConf) ? nowConf : 0,
+                };
+                const cards = [
+                    nowCard,
+                    ...hours.map(h => ({
+                        timeLabel: formatWibTime(h.timestamp),
+                        type: h.weather_type || '--',
+                        prob: Number(h.rain_probability) || 0,
+                        probLabel: h.rain_probability_label || `Potensi hujan: ${Math.round(Number(h.rain_probability) || 0)}%`,
+                        conf: Number(h.confidence) || 0,
+                        confLabel: h.confidence_label || `Kepercayaan: ${Math.round((Number(h.confidence) || 0)*100)}%`,
+                    }))
+                ];
+
+                while (cards.length < 4) {
+                    cards.push({ timeLabel: '--.--', type: '--', prob: 0, conf: 0 });
+                }
+
+                elRow.innerHTML = cards.map(c => {
+                    const icon = iconForWeather(c.type);
+                    const prob = Math.round(c.prob);
+                    const conf = Math.round((c.conf || 0) * 100);
+                    return `
+                        <div class="ai-hour">
+                            <div class="ai-hour-top">
+                                <div class="ai-hour-time">${c.timeLabel}</div>
+                                <i class="fas ${icon} ai-hour-icon"></i>
+                            </div>
+                            <div class="ai-hour-type">${c.type}</div>
+                            <div class="ai-hour-meta">
+                                <div>Hujan: <strong>${prob}%</strong></div>
+                                <div>Yakin: <strong>${conf}%</strong></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+        
+        // Fetch initial data
+        async function fetchInitialData() {
+            try {
+                const response = await fetch(apiUrl('/api/dashboard-stats'));
+                const data = await response.json();
+                
+                if (data) {
+                    updateDashboardEnhanced(data);
+                    updateCharts(data);
+                    updateStatusIndicators({
+                        firebase_connected: data.firebase_available,
+                        last_update: data.last_reading?.timestamp,
+                        data_source: data.data_source
+                    });
+
+                    // Notifikasi AI ready (tanpa auto-training)
+                    maybeNotifyAiReady(data);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+                // Don't show toast on initial load to prevent spam
+            }
+        }
+
+        let aiReadyNotified = false;
+        let lastAiReady = null;
+
+        function maybeNotifyAiReady(dashboardStats) {
+            try {
+                const ready = Boolean(dashboardStats?.ai_ready);
+                if (lastAiReady === null) lastAiReady = ready;
+                // hanya notif saat transisi false -> true
+                if (!aiReadyNotified && lastAiReady === false && ready === true) {
+                    aiReadyNotified = true;
+                    showToast('AI siap di-training. Klik "Latih AI" untuk memulai.', 'success', 3500);
+                }
+                lastAiReady = ready;
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        async function pollAiStatus() {
+            try {
+                const res = await fetch(apiUrl('/api/ai/status'));
+                if (!res.ok) return;
+                const data = await res.json();
+                const ready = Boolean(data?.ready);
+                if (lastAiReady === null) lastAiReady = ready;
+                if (!aiReadyNotified && lastAiReady === false && ready === true) {
+                    aiReadyNotified = true;
+                    showToast('AI siap di-training. Klik "Latih AI" untuk memulai.', 'success', 3500);
+                }
+                lastAiReady = ready;
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        async function fetchStatusUpdate() {
+            try {
+                const response = await fetch(apiUrl('/api/status'));
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                updateStatusIndicators(data);
+                lastStatusAt = Date.now();
+            } catch (error) {
+                console.error('Gagal memuat status:', error);
+                updateStatusIndicators({ server_connected: false });
+            }
+        }
+
+        function restartDataTimer() {
+            if (dataTimer) clearInterval(dataTimer);
+            if (!autoRefreshEnabled) return;
+            if (typeof fetchInitialData !== 'function') {
+                console.warn('fetchInitialData tidak tersedia, timer tidak dijalankan.');
+                return;
+            }
+            const cs = (typeof clientSettings === 'object' && clientSettings) ? clientSettings : {};
+            let intervalSec = parseInt(cs.update_interval, 10);
+            if (!Number.isFinite(intervalSec) || intervalSec <= 0) intervalSec = 5;
+            intervalSec = Math.max(1, Math.min(3600, intervalSec));
+            const intervalMs = intervalSec * 1000;
+            dataTimer = setInterval(fetchInitialData, intervalMs);
+        }
+
+        function startStatusPolling() {
+            if (statusTimer) clearInterval(statusTimer);
+            statusTimer = setInterval(fetchStatusUpdate, STATUS_POLL_MS);
+        }
+        
+        // Start periodic updates as fallback
+        function startPeriodicUpdates() {
+            setInterval(async () => {
+                if (!autoRefreshEnabled || socketConnected) return;
+                
+                try {
+                    const response = await fetch(apiUrl('/api/dashboard-stats'));
+                    const stats = await response.json();
+                    
+                    if (stats.last_reading) {
+                        scheduleUiUpdate(stats.last_reading);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error in periodic update:', error);
+                }
+            }, 10000); // Update every 10 seconds (fallback only)
+        }
+        
+        // Refresh data function
+        function refreshData() {
+            showToast('Memperbarui data...', 'info', 1500);
+            
+            // Fetch fresh data from server
+            fetchInitialData();
+            
+            // Don't update status indicators here to prevent flickering
+            // Let the dashboard refresh handle status updates
+        }
+        
+        // Additional action functions
+        function openInMaps() {
+            // Get current GPS coordinates from dashboard
+            const lat = document.getElementById('gps-lat').textContent;
+            const lng = document.getElementById('gps-lng').textContent;
+            
+            if (lat && lng && lat !== '--' && lng !== '--') {
+                const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                window.open(mapsUrl, '_blank');
+                showToast('Membuka lokasi di Google Maps...', 'info', 2000);
+            } else {
+                showToast('Data GPS tidak tersedia', 'warning', 2000);
+            }
+        }
+        
+        function sendTestData() {
+            showToast('Mengirim data test...', 'info', 2000);
+            
+            // Generate test sensor data
+            const testData = {
+                temperature: (Math.random() * 10 + 25).toFixed(2),
+                humidity: (Math.random() * 20 + 60).toFixed(2),
+                air_quality: Math.floor(Math.random() * 100 + 50),
+                light_intensity: (Math.random() * 50 + 10).toFixed(2),
+                battery_voltage: (Math.random() * 1 + 3).toFixed(2),
+                battery_current: Math.floor(Math.random() * 20 + 5),
+                battery_power: Math.floor(Math.random() * 30 + 20),
+                latitude: -7.230958,
+                longitude: 112.753463,
+                location: 'Surabaya, Indonesia',
+                device_id: 'TEST_DEVICE',
+                timestamp: new Date().toISOString()
+            };
+            
+            // Send test data to server
+            fetch(apiUrl('/api/sensor-data'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(testData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .then(data => {
+                showToast('Data test berhasil dikirim!', 'success', 2000);
+                // Don't update status indicators here to prevent flickering
+                // Just refresh dashboard to show new data
+                setTimeout(() => {
+                    fetchInitialData();
+                }, 1000);
+            })
+            .catch(error => {
+                console.error('Error sending test data:', error);
+                showToast('Gagal mengirim data test', 'error', 2000);
+                // Don't update status indicators here to prevent flickering
+            });
+        }
+        
+        function trainAI() {
+            const forceSingle = document.getElementById('force-single-class')?.checked;
+            showToast('Melatih model AI...', 'info', 2000);
+            
+            fetch(apiUrl('/api/train-model'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(forceSingle ? { force_single_class: true } : {})
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const msg = await response.text().catch(() => '');
+                    throw new Error(msg || `HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.model_trained) {
+                    showToast('Model AI berhasil dilatih!', 'success', 3000);
+                    return;
+                }
+                if (data && data.status === 'training_started') {
+                    showToast('Training AI dimulai (berjalan di background)', 'success', 3000);
+                    return;
+                }
+
+                const reason = (data && (data.error || data.message)) ? `: ${data.error || data.message}` : '';
+                showToast(`Gagal melatih model AI${reason}`, 'error', 3500);
+            })
+            .catch(error => {
+                console.error('Error training AI model:', error);
+                showToast(`Error melatih model AI: ${error?.message || error}`, 'error', 3500);
+                // Don't update status indicators here to prevent flickering
+            });
+            
+            // Refresh dashboard after training to show updated status
+            setTimeout(() => {
+                fetchInitialData();
+            }, 2000);
+        }
+        
+	        function testFirebase() {
+	            showToast('Menguji koneksi Firebase...', 'info', 2000);
+            
+            fetch(apiUrl('/api/test-firebase'))
+            .then(async response => {
+                if (!response.ok) {
+                    const msg = await response.text().catch(() => '');
+                    throw new Error(msg || `HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.connection_test) {
+                    if (data.firebase_available) {
+                        showToast('Firebase connection: BERHASIL', 'success', 3000);
+                    } else {
+                        showToast('Firebase dapat diakses, tapi belum diaktifkan (klik Sambungkan Firebase)', 'warning', 3500);
+                    }
+                    return;
+                }
+
+                const cfg = data?.config?.database_url ? ` (${data.config.database_url})` : '';
+                showToast(`Firebase connection: GAGAL${cfg}`, 'error', 3500);
+            })
+            .catch(error => {
+                console.error('Error testing Firebase:', error);
+                showToast(`Error menguji Firebase: ${error?.message || error}`, 'error', 3500);
+                // Don't update status indicators here to prevent flickering
+            });
+            
+            // Refresh dashboard after test to show updated status
+	            setTimeout(() => {
+	                fetchInitialData();
+	            }, 1500);
+	        }
+
+	        async function loadFirebaseStatus() {
+	            try {
+	                const resp = await fetch(apiUrl('/api/firebase/status'));
+	                if (!resp.ok) return;
+	                const st = await resp.json().catch(() => ({}));
+	                firebaseEnabledState = !!st.enabled;
+	                updateFirebaseToggleButton();
+	            } catch (err) {
+	                console.warn('Gagal memuat status Firebase:', err);
+	            }
+	        }
+
+	        function updateFirebaseToggleButton() {
+	            const btn = document.getElementById('firebaseToggleButton');
+	            const label = document.getElementById('firebaseToggleLabel');
+	            const icon = document.getElementById('firebaseToggleIcon');
+	            if (!btn || !label || !icon) return;
+
+	            label.textContent = firebaseEnabledState ? 'Putuskan Firebase' : 'Sambungkan Firebase';
+	            icon.className = `fas ${firebaseEnabledState ? 'fa-plug-circle-xmark' : 'fa-plug'}`;
+	            btn.disabled = !!firebaseToggleBusy;
+	            btn.setAttribute('aria-disabled', firebaseToggleBusy ? 'true' : 'false');
+	        }
+
+	        async function toggleFirebaseConnection() {
+	            if (firebaseToggleBusy) return;
+	            firebaseToggleBusy = true;
+	            updateFirebaseToggleButton();
+	            try {
+	                const endpoint = firebaseEnabledState ? '/api/firebase/disconnect' : '/api/firebase/connect';
+	                const resp = await fetch(apiUrl(endpoint), { method: 'POST' });
+	                if (!resp.ok) {
+	                    const msg = await resp.text().catch(() => '');
+	                    throw new Error(msg || `HTTP ${resp.status}`);
+	                }
+	                const result = await resp.json().catch(() => ({}));
+	                firebaseEnabledState = !!result.enabled;
+	                showToast(firebaseEnabledState ? 'Firebase tersambung' : 'Firebase diputus', 'success', 2000);
+	                updateFirebaseToggleButton();
+	                fetchStatusUpdate();
+	                fetchInitialData();
+	            } catch (err) {
+	                console.error('toggleFirebaseConnection error:', err);
+	                showToast(`Gagal mengubah koneksi Firebase: ${err?.message || err}`, 'error', 3500);
+	            } finally {
+	                firebaseToggleBusy = false;
+	                updateFirebaseToggleButton();
+	                loadFirebaseStatus();
+	            }
+	        }
+	        
+	        // Export data function
+	        function exportData() {
+	            showToast('Mengekspor data...', 'info', 2000);
+            
+            // Get current date range
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const format = document.getElementById('exportFormat').value;
+            
+            // Create export URL
+            const exportUrl = apiUrl(`/api/export-data?start_date=${startDate}&end_date=${endDate}&format=${format}`);
+            
+            fetch(exportUrl)
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                } else {
+                    throw new Error('Export failed');
+                }
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `weather-data-${new Date().toISOString().split('T')[0]}.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                showToast('Data berhasil diekspor!', 'success', 3000);
+            })
+            .catch(error => {
+                console.error('Error exporting data:', error);
+                showToast('Gagal mengekspor data', 'error', 3000);
+            });
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info', duration = 3000) {
+            // Remove existing toast
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Auto remove after duration
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, duration);
+        }
+
+        function toggleHeaderActions(forceClose = false) {
+            const panel = document.getElementById('headerMorePanel');
+            const backdrop = document.getElementById('headerMoreBackdrop');
+            if (!panel || !backdrop) return;
+
+            const willOpen = forceClose ? false : panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !willOpen);
+            backdrop.classList.toggle('hidden', !willOpen);
+
+            if (willOpen) {
+                const batteryPanel = document.getElementById('headerBatteryPanel');
+                const batteryBackdrop = document.getElementById('headerBatteryBackdrop');
+                if (batteryPanel) batteryPanel.classList.add('hidden');
+                if (batteryBackdrop) batteryBackdrop.classList.add('hidden');
+                const btn = document.getElementById('headerBatteryButton');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        function toggleBatteryDetails(forceClose = false) {
+            const panel = document.getElementById('headerBatteryPanel');
+            const backdrop = document.getElementById('headerBatteryBackdrop');
+            const btn = document.getElementById('headerBatteryButton');
+            if (!panel || !backdrop || !btn) return;
+
+            const willOpen = forceClose ? false : panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !willOpen);
+            backdrop.classList.toggle('hidden', !willOpen);
+            btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+
+            if (willOpen) {
+                const morePanel = document.getElementById('headerMorePanel');
+                const moreBackdrop = document.getElementById('headerMoreBackdrop');
+                if (morePanel) morePanel.classList.add('hidden');
+                if (moreBackdrop) moreBackdrop.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('scroll', () => {
+            toggleHeaderActions(true);
+            toggleBatteryDetails(true);
+        }, { passive: true });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            toggleHeaderActions(true);
+            toggleBatteryDetails(true);
+        });
+
+        let appHeaderResizeObserver;
+        function updateAppHeaderHeight() {
+            const header = document.querySelector('header.app-header');
+            if (!header) return;
+
+            const measure = () => {
+                const heightPx = Math.ceil(header.getBoundingClientRect().height);
+                document.documentElement.style.setProperty('--app-header-h', `${heightPx}px`);
+            };
+
+            // Initial measure
+            measure();
+
+            // Keep synced if header height changes (mobile wrap, status bar, etc.)
+            if (!appHeaderResizeObserver && 'ResizeObserver' in window) {
+                appHeaderResizeObserver = new ResizeObserver(() => {
+                    window.requestAnimationFrame(measure);
+                });
+                appHeaderResizeObserver.observe(header);
+            }
+        }
+
+        function formatAddress(addressObj) {
+            if (!addressObj) return '';
+            const parts = [
+                addressObj.road || addressObj.neighbourhood || addressObj.suburb,
+                addressObj.city || addressObj.town || addressObj.village || addressObj.municipality,
+                addressObj.state,
+                addressObj.postcode,
+                addressObj.country
+            ].filter(Boolean);
+            return parts.join(', ');
+        }
+
+        async function resolveAddress(lat, lng) {
+            const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+            if (addressCache[key]) return addressCache[key];
+            try {
+                const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'weather-station-dashboard/1.0'
+                    }
+                });
+                if (!resp.ok) throw new Error('reverse geocode failed');
+                const data = await resp.json();
+                const addr = formatAddress(data.address) || data.display_name || '';
+                addressCache[key] = addr;
+                return addr;
+            } catch (err) {
+                console.warn('Reverse geocode error', err);
+                return '';
+            }
+        }
+    </script>
+</body>
+</html>

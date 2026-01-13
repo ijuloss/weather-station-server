@@ -1,0 +1,27 @@
+{
+  "sensor_interval": 5,
+  "selected_sensors": {
+    "temperature": true,
+    "humidity": true,
+    "air_quality": true,
+    "light_intensity": true,
+    "gps_latitude": true,
+    "gps_longitude": true,
+    "current": true,
+    "voltage": true,
+    "power": true,
+    "battery_voltage": true
+  },
+  "calibration_values": {
+    "temperature": 0,
+    "humidity": 0,
+    "air_quality": 0,
+    "light_intensity": 0,
+    "gps_latitude": 0,
+    "gps_longitude": 0,
+    "current": 0,
+    "voltage": 0,
+    "power": 0,
+    "battery_voltage": 0
+  }
+}
