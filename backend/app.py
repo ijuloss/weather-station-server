@@ -1155,7 +1155,6 @@ class WeatherAIModel:
                 sensor_data.get('humidity', 0),
                 sensor_data.get('air_quality', 0),
                 sensor_data.get('light_intensity', 0),
-                sensor_data.get('battery_voltage', 0)
             ]])
             
             # Scale features
