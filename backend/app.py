@@ -905,7 +905,8 @@ class WeatherAIModel:
             samples = X_train[idxs]
             for i in range(needed):
                 src = samples[i % len(samples)]
-                jitter = rng.normal(0, [0.5, 1.0, 5.0, 50.0, 0.02])
+                # Jitter disesuaikan dengan 4 fitur (temp, humidity, air_quality, light)
+                jitter = rng.normal(0, [0.5, 1.5, 15.0, 200.0])
                 new_sample = src + jitter
                 X_new.append(new_sample.reshape(1, -1))
                 y_new.append(np.array([label]))
