@@ -1251,6 +1251,10 @@ class FuzzyForecastEngine:
         return "Cerah"
 
     def rain_probability(self, temp_c: float, humidity: float, lux: float) -> float:
+        # Aturan prioritas: kelembapan tinggi langsung dianggap sangat berpotensi hujan
+        if humidity >= 79:
+            return 100.0
+
         # Normalized scores (0..1)
         humidity_score = min(1.0, max(0.0, (humidity - 55.0) / 45.0))
         light_score = min(1.0, max(0.0, (10000.0 - lux) / 10000.0))
@@ -1750,6 +1754,33 @@ def get_from_firebase(path):
         if current_status.get('firebase_connected', False):
             broadcast_status_change('firebase', False)
         return None
+
+def _latest_local_snapshot(limit: int):
+    """
+    Ambil snapshot data lokal dengan fallback ke backup terbaru bila memori kosong.
+    Tidak mengubah alur lain, hanya digunakan untuk kebutuhan ekspor/historical.
+    """
+    global local_data
+    # Jika sudah ada data di memori, pakai langsung
+    if local_data:
+        return local_data[-limit:]
+
+    # Coba restore dari backup terbaru jika ada
+    try:
+        backup_dir = Path(config.get('DATA_DIR')) / 'backups'
+        backup_files = sorted(backup_dir.glob("backup_*.json"))
+        if not backup_files:
+            return []
+
+        latest_backup = backup_files[-1]
+        with open(latest_backup, 'r', encoding='utf-8') as f:
+            backup_payload = json.load(f)
+            restored = backup_payload.get('local_data') or []
+            # Jangan ubah state global di sini; cukup kembalikan snapshot
+            return restored[-limit:]
+    except Exception as e:
+        logger.warning(f"Failed to load local snapshot from backup: {e}")
+        return []
 
 # Data backup functions
 def backup_data():
@@ -2429,14 +2460,13 @@ def get_historical_data():
                 logger.warning(f"Firebase historical data error: {firebase_error}")
         
         # Fallback to local data
-        data = {}
-        for i, item in enumerate(local_data[-limit:]):
-            data[f"reading_{i}"] = item
+        snapshot = _latest_local_snapshot(limit)
+        data = {f"reading_{i}": item for i, item in enumerate(snapshot)}
         
         return jsonify({
             "data": data,
             "count": len(data),
-            "source": "local"
+            "source": "local" if local_data else "local_backup" if snapshot else "none"
         })
         
     except Exception as e:
