@@ -2884,51 +2884,59 @@
         }
         
         function sendTestData() {
-            showToast('Mengirim data test...', 'info', 2000);
+            showToast('Mengirim paket data uji beragam...', 'info', 2000);
             
-            // Generate test sensor data
-            const testData = {
-                temperature: (Math.random() * 10 + 25).toFixed(2),
-                humidity: (Math.random() * 20 + 60).toFixed(2),
-                air_quality: Math.floor(Math.random() * 100 + 50),
-                light_intensity: (Math.random() * 50 + 10).toFixed(2),
-                battery_voltage: (Math.random() * 1 + 3).toFixed(2),
-                battery_current: Math.floor(Math.random() * 20 + 5),
-                battery_power: Math.floor(Math.random() * 30 + 20),
-                latitude: -7.230958,
-                longitude: 112.753463,
-                location: 'Surabaya, Indonesia',
-                device_id: 'TEST_DEVICE',
-                timestamp: new Date().toISOString()
-            };
+            const now = Date.now();
+            const baseCoords = { lat: -7.230958, lng: 112.753463 };
             
-            // Send test data to server
-            fetch(apiUrl('/api/sensor-data'), {
+            // Beberapa skenario sintetis beragam
+            const archetypes = [
+                { temperature: 12, humidity: 85, air_quality: 40,  light_intensity: 120,  label: 'cool_humid' },
+                { temperature: 34, humidity: 28, air_quality: 95,  light_intensity: 1600, label: 'hot_dry' },
+                { temperature: 28, humidity: 78, air_quality: 140, light_intensity: 900,  label: 'hot_humid' },
+                { temperature: 24, humidity: 58, air_quality: 70,  light_intensity: 650,  label: 'normal' },
+                { temperature: 20, humidity: 40, air_quality: 50,  light_intensity: 12000, label: 'bright_cool' },
+                { temperature: 30, humidity: 68, air_quality: 220, light_intensity: 400,  label: 'polluted_mid' },
+                { temperature: 18, humidity: 92, air_quality: 60,  light_intensity: 80,   label: 'rainy_cool' }
+            ];
+            
+            const jitter = (v, spread) => v + (Math.random() * 2 - 1) * spread;
+            
+            const SAMPLE_COUNT = 50;
+            const payloads = [];
+            for (let i = 0; i < SAMPLE_COUNT; i++) {
+                const arch = archetypes[i % archetypes.length];
+                payloads.push({
+                    temperature: Number(jitter(arch.temperature, 1.5)).toFixed(2),
+                    humidity: Number(jitter(arch.humidity, 4)).toFixed(2),
+                    air_quality: Math.max(1, Math.round(jitter(arch.air_quality, 25))),
+                    light_intensity: Number(Math.max(0, jitter(arch.light_intensity, 400))).toFixed(2),
+                    battery_voltage: Number(jitter(3.8, 0.15)).toFixed(2),
+                    battery_current: Math.max(0, Math.round(jitter(15, 6))),
+                    battery_power: Math.max(0, Math.round(jitter(25, 10))),
+                    latitude: baseCoords.lat + (Math.random() * 0.0005 - 0.00025),
+                    longitude: baseCoords.lng + (Math.random() * 0.0005 - 0.00025),
+                    location: 'Surabaya, Indonesia',
+                    device_id: `TEST_DEVICE_${arch.label}_${i}`,
+                    timestamp: new Date(now + i * 200).toISOString()
+                });
+            }
+            
+            // Kirim paralel
+            Promise.all(payloads.map(body => fetch(apiUrl('/api/sensor-data'), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(testData)
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-            })
-            .then(data => {
-                showToast('Data test berhasil dikirim!', 'success', 2000);
-                // Don't update status indicators here to prevent flickering
-                // Just refresh dashboard to show new data
-                setTimeout(() => {
-                    fetchInitialData();
-                }, 1000);
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })))
+            .then(responses => {
+                const failed = responses.filter(r => !r.ok);
+                if (failed.length) throw new Error(`Gagal ${failed.length} dari ${responses.length}`);
+                showToast(`Data uji dikirim: ${responses.length} sampel`, 'success', 2500);
+                setTimeout(() => fetchInitialData(), 1200);
             })
             .catch(error => {
-                console.error('Error sending test data:', error);
-                showToast('Gagal mengirim data test', 'error', 2000);
-                // Don't update status indicators here to prevent flickering
+                console.error('Error sending test data batch:', error);
+                showToast('Gagal mengirim paket data uji', 'error', 2500);
             });
         }
         
