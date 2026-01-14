@@ -821,7 +821,7 @@ class WeatherAIModel:
             light_intensity = to_float_safe(item.get('light_intensity'))
             battery_voltage = to_float_safe(item.get('battery_voltage'))
 
-            feature_vector = [temp, humidity, air_quality, light_intensity, battery_voltage]
+            feature_vector = [temp, humidity, air_quality, light_intensity]
             features.append(feature_vector)
 
             # Use label helper for consistency
@@ -880,12 +880,12 @@ class WeatherAIModel:
         labels = []
         for arch in archetypes:
             for _ in range(n_each):
-                temp = float(arch.get('temperature', 20.0)) + float(rng.normal(0, 0.5))
-                humidity = float(arch.get('humidity', 50.0)) + float(rng.normal(0, 1.0))
-                air_quality = float(arch.get('air_quality', 50.0)) + float(rng.normal(0, 5.0))
-                light_intensity = float(arch.get('light_intensity', 500.0)) + float(rng.normal(0, 50.0))
-                battery_voltage = float(arch.get('battery_voltage', 3.8)) + float(rng.normal(0, 0.02))
-                feats.append([temp, humidity, air_quality, light_intensity, battery_voltage])
+                # Jitter diperbesar agar variasi sintetis lebih luas dan tidak overfit pola sempit
+                temp = float(arch.get('temperature', 20.0)) + float(rng.normal(0, 1.5))
+                humidity = float(arch.get('humidity', 50.0)) + float(rng.normal(0, 3.0))
+                air_quality = float(arch.get('air_quality', 50.0)) + float(rng.normal(0, 15.0))
+                light_intensity = float(arch.get('light_intensity', 500.0)) + float(rng.normal(0, 200.0))
+                feats.append([temp, humidity, air_quality, light_intensity])
                 labels.append(self._label_from_features(temp, humidity, air_quality))
         return np.array(feats, dtype=float), np.array(labels)
 
@@ -1007,6 +1007,21 @@ class WeatherAIModel:
             
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
+
+            # Tambah sampel sintetis ringan untuk menyeimbangkan variasi label (hanya TRAIN, bukan TEST)
+            augment_archetypes = [
+                {'temperature': 12, 'humidity': 85, 'air_quality': 40, 'light_intensity': 150},   # Cool Humid
+                {'temperature': 34, 'humidity': 25, 'air_quality': 90, 'light_intensity': 1500},  # Hot Dry
+                {'temperature': 28, 'humidity': 75, 'air_quality': 120, 'light_intensity': 900},  # Hot Humid
+                {'temperature': 22, 'humidity': 55, 'air_quality': 60, 'light_intensity': 700},   # Normal
+            ]
+            syn_X_base, syn_y_base = self._generate_synthetic_features(augment_archetypes, rng, n_each=1)
+            if len(syn_y_base) > 0:
+                X_train = np.vstack([X_train, syn_X_base])
+                y_train = np.concatenate([y_train, syn_y_base])
+                synthetic_used = True
+                warning_msgs.append("Training memakai sampel sintetis tambahan (augment_archetypes). Evaluasi tetap hati-hati.")
+                logger.info(f"AI: Added base synthetic samples: {len(syn_y_base)}")
 
             # If synthetic augmentation requested (force single-class), add synthetic samples to TRAIN only
             if needs_synthetic:
@@ -1160,7 +1175,10 @@ class WeatherAIModel:
                 # Penalize confidence based on prediction entropy
                 # If multiple classes have similar probability, confidence should be lower
                 # Entropy: -sum(p*log(p)) normalized to 0-1
-                entropy = -np.sum(probabilities * np.log(probabilities + 1e-10)) / np.log(len(probabilities))
+                if len(probabilities) <= 1:
+                    entropy = 0.0
+                else:
+                    entropy = -np.sum(probabilities * np.log(probabilities + 1e-10)) / np.log(len(probabilities))
                 # High entropy (uncertain) = confidence penalty; low entropy (certain) = no penalty
                 entropy_penalty = entropy * 0.3  # Up to 30% confidence reduction for high entropy
                 confidence = max(0.0, top_prob - entropy_penalty)
@@ -1234,8 +1252,8 @@ class FuzzyForecastEngine:
             ("Gelap", 0, 50),
             ("Mendung", 50, 1000),
             ("Berawan", 1000, 10000),
-            ("Cerah", 10000, 50000),
-            ("Terik", 50000, float("inf")),
+            ("Cerah", 10000, 35000),
+            ("Terik", 35000, float("inf")),
         ]
 
     def _to_float(self, value, default=0.0):
@@ -1252,7 +1270,7 @@ class FuzzyForecastEngine:
 
     def rain_probability(self, temp_c: float, humidity: float, lux: float) -> float:
         # Aturan prioritas: kelembapan tinggi langsung dianggap sangat berpotensi hujan
-        if humidity >= 79:
+        if humidity >= 80:
             return 100.0
 
         # Normalized scores (0..1)
@@ -1266,6 +1284,12 @@ class FuzzyForecastEngine:
             risk *= 0.6
         elif light_label == "Gelap":
             risk = min(1.0, risk * 1.15)
+
+        # Jika kelembapan belum tinggi tapi lux sangat rendah (malam/gelap),
+        # batasi risiko supaya tidak mudah false positive hujan.
+        if humidity < 80 and lux < 50:
+            risk = min(risk, 0.6)
+
         return min(1.0, max(0.0, risk)) * 100.0
 
     def weather_type(self, rain_prob: float, lux: float) -> str:
