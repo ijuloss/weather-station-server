@@ -2483,14 +2483,24 @@ def get_historical_data():
             except Exception as firebase_error:
                 logger.warning(f"Firebase historical data error: {firebase_error}")
         
-        # Fallback to local data
+        # Fallback to local data / backup
         snapshot = _latest_local_snapshot(limit)
+        if not snapshot:
+            try:
+                # Coba restore dari backup lalu ambil ulang snapshot
+                restored = restore_data()
+                if restored:
+                    snapshot = _latest_local_snapshot(limit)
+            except Exception:
+                pass
+
         data = {f"reading_{i}": item for i, item in enumerate(snapshot)}
+        source_label = "local" if local_data else "local_backup" if snapshot else "none"
         
         return jsonify({
             "data": data,
             "count": len(data),
-            "source": "local" if local_data else "local_backup" if snapshot else "none"
+            "source": source_label
         })
         
     except Exception as e:

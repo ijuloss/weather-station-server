@@ -706,7 +706,6 @@
                             <select class="config-input" id="exportFormat">
                                 <option value="csv">CSV</option>
                                 <option value="json">JSON</option>
-                                <option value="excel">Excel</option>
                             </select>
                         </div>
                         <div class="config-item">
@@ -739,7 +738,6 @@
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button class="btn-secondary" onclick="previewExport()">Preview</button>
                     <button class="btn-primary" onclick="downloadExport()">
                         <i class="fas fa-download"></i>
                         Download Export
@@ -1489,30 +1487,54 @@
             
             showToast(`Preparing ${format.toUpperCase()} export...`, 'info');
             
-            // Fetch data dari API
-            fetch(apiUrl('/api/historical-data?limit=10000'))
-                .then(res => res.json())
-                .then(response => {
-                    let data = response.data || [];
+            const fetchHistorical = () => fetch(apiUrl('/api/historical-data?limit=10000')).then(r => r.json());
+            const fetchPred = () => fetch(apiUrl('/api/predictions?limit=1000')).then(r => r.json());
+
+            const fetchPromise = dataType === 'all'
+                ? Promise.all([fetchHistorical(), fetchPred()]).then(([hist, pred]) => {
+                    const histData = hist.data || [];
+                    const preds = pred.predictions || [];
+                    const arrHist = Array.isArray(histData) ? histData : Object.values(histData);
+                    const arrPred = Array.isArray(preds) ? preds : Object.values(preds);
+                    return arrHist.concat(arrPred);
+                })
+                : (dataType === 'predictions'
+                    ? fetchPred().then(res => res.predictions || res.data || [])
+                    : fetchHistorical().then(res => res.data || []));
+
+            fetchPromise
+                .then(rawData => {
+                    let data = rawData;
                     if (typeof data === 'object' && !Array.isArray(data)) {
                         data = Object.values(data);
                     }
+                    // Urutkan berdasarkan timestamp terbaru agar prediksi dan sensor tercampur
+                    data = data.slice().sort((a, b) => {
+                        const ta = new Date((a && (a.timestamp || a.time || a.ts)) || 0).getTime();
+                        const tb = new Date((b && (b.timestamp || b.time || b.ts)) || 0).getTime();
+                        return tb - ta;
+                    });
                     
                     // Filter by date range if provided
                     if (startDate || endDate) {
-                        const start = startDate ? new Date(startDate) : new Date(0);
-                        const end = endDate ? new Date(endDate) : new Date();
+                        const start = startDate ? new Date(startDate + 'T00:00:00') : new Date(0);
+                        const endBase = endDate ? new Date(endDate + 'T00:00:00') : new Date();
+                        // inklusif sampai akhir hari
+                        const end = new Date(endBase.getTime());
+                        end.setHours(23, 59, 59, 999);
                         data = data.filter(item => {
-                            const itemDate = new Date(item.timestamp);
+                            if (!item || typeof item !== 'object') return true;
+                            const ts = item.timestamp || item.time || item.ts;
+                            if (!ts) return true; // keep if no timestamp
+                            const itemDate = new Date(ts);
+                            if (isNaN(itemDate.getTime())) return true; // keep if timestamp invalid
                             return itemDate >= start && itemDate <= end;
                         });
                     }
                     
-                    // Filter by data type
+                    // Filter by data type (skip extra filtering for predictions endpoint)
                     if (dataType === 'sensors') {
                         data = data.filter(item => item.temperature !== undefined);
-                    } else if (dataType === 'predictions') {
-                        data = data.filter(item => item.weather_type !== undefined && item.rain_probability !== undefined);
                     }
                     
                     let content = '';
@@ -1524,7 +1546,8 @@
                         mimeType = 'text/csv';
                         fileExt = 'csv';
                     } else if (format === 'json') {
-                        content = JSON.stringify(data, null, 2);
+                        const normalized = data.map(normalizeForExport);
+                        content = JSON.stringify(normalized, null, 2);
                         mimeType = 'application/json';
                         fileExt = 'json';
                     } else if (format === 'excel') {
@@ -1552,41 +1575,165 @@
                 });
         }
         
+        const formatTimestampWIB = (() => {
+            const fmtWIB = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Jakarta',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            });
+            return (val) => {
+                if (!val) return '';
+                try {
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return String(val);
+                    const parts = fmtWIB.formatToParts(d).reduce((acc, p) => {
+                        acc[p.type] = p.value; return acc;
+                    }, {});
+                    return `${parts.day}/${parts.month}/${parts.year}_${parts.hour}:${parts.minute}:${parts.second}`;
+                } catch (e) {
+                    return String(val);
+                }
+            };
+        })();
+
+        function convertCanonical(item) {
+            if (!item || typeof item !== 'object') return item;
+            const clone = { ...item };
+            const aliases = [
+                ['latitude', 'gps_latitude'],
+                ['longitude', 'gps_longitude'],
+                ['battery_voltage', 'voltage'],
+                ['battery_current', 'current', 'current_mA'],
+                ['battery_power', 'power', 'power_mW'],
+            ];
+            aliases.forEach(group => {
+                const chosen = group.find(k => clone[k] !== undefined);
+                group.forEach(k => {
+                    if (k !== chosen) delete clone[k];
+                });
+            });
+            return clone;
+        }
+
+        function normalizeForExport(item) {
+            const canon = convertCanonical(item);
+            if (!canon || typeof canon !== 'object') return canon;
+            // Tandai jenis record
+            const isSensor = canon.temperature !== undefined || canon.humidity !== undefined;
+            canon.record_type = isSensor ? 'sensor' : 'prediction';
+            // Format timestamp
+            if (canon.timestamp) {
+                canon.timestamp = formatTimestampWIB(canon.timestamp);
+            }
+            // Isi location bila kosong
+            if (!canon.location || String(canon.location).trim() === '') {
+                const lat = canon.latitude;
+                const lon = canon.longitude;
+                if (lat !== undefined && lon !== undefined) {
+                    const fmt = (v) => {
+                        const num = Number(v);
+                        return isNaN(num) ? String(v) : num.toFixed(6);
+                    };
+                    canon.location = `${fmt(lat)},${fmt(lon)}`;
+                }
+            }
+            // Flatten objek/array ke string agar tidak kosong
+            Object.keys(canon).forEach(key => {
+                const val = canon[key];
+                if (Array.isArray(val) || (val && typeof val === 'object')) {
+                    try {
+                        canon[key] = JSON.stringify(val);
+                    } catch (e) {
+                        canon[key] = String(val);
+                    }
+                }
+            });
+            return canon;
+        }
+
         function convertToCSV(data) {
             if (!data || data.length === 0) {
                 return 'No data available';
             }
             
-            // Get all unique keys from data
-            const keys = new Set();
-            data.forEach(item => {
-                Object.keys(item).forEach(key => keys.add(key));
+            const delim = ';';
+
+            // Normalisasi dulu supaya record_type, timestamp terformat, dan objek ter-flatten
+            const normalizedData = data.map(item => normalizeForExport(item) || {});
+
+            // Kumpulkan semua key dari data yang sudah dinormalisasi
+            const keySet = new Set();
+            normalizedData.forEach(item => {
+                Object.keys(item).forEach(key => keySet.add(key));
             });
-            const headers = Array.from(keys);
+
+            // Urutan prioritas agar kolom tidak acak
+            const priority = [
+                'timestamp', 'record_type', 'device_id', 'location', 'latitude', 'longitude',
+                'temperature', 'humidity', 'air_quality', 'air_quality_raw', 'light_intensity',
+                'battery_voltage', 'battery_current', 'battery_power',
+                'gps_sats', 'gps_valid',
+                'firmware', 'free_heap', 'uptime_ms', 'wifi_rssi'
+            ];
+
+            // Alias: pilih satu yang paling kanonik
+            const aliasGroups = [
+                ['latitude', 'gps_latitude'],
+                ['longitude', 'gps_longitude'],
+                ['battery_voltage', 'voltage'],
+                ['battery_current', 'current', 'current_mA'],
+                ['battery_power', 'power', 'power_mW'],
+            ];
+
+            aliasGroups.forEach(group => {
+                const chosen = group.find(key => keySet.has(key));
+                group.forEach(key => {
+                    if (key !== chosen && keySet.has(key)) keySet.delete(key);
+                });
+            });
+
+            const headers = [
+                ...priority.filter(k => keySet.has(k)),
+                ...Array.from(keySet).filter(k => !priority.includes(k)).sort()
+            ];
             
             // Create CSV header
-            let csv = headers.join(',') + '\n';
+            let csv = headers.join(delim) + '\n';
             
             // Add data rows
-            data.forEach(item => {
+            normalizedData.forEach(canon => {
+                const safeObj = (canon && typeof canon === 'object') ? canon : {};
                 const row = headers.map(header => {
-                    const value = item[header];
+                    const value = safeObj[header];
                     if (value === null || value === undefined) {
+                        return '';
+                    }
+                    if (header === 'timestamp') {
+                        return value;
+                    }
+                    if (header === 'location') {
+                        const hasLocation = String(value || '').trim().length > 0;
+                        if (hasLocation) return String(value);
+                        const lat = canon.latitude;
+                        const lon = canon.longitude;
+                        if (lat !== undefined && lon !== undefined) {
+                            const fmt = (v) => {
+                                const num = Number(v);
+                                return isNaN(num) ? String(v) : num.toFixed(6);
+                            };
+                            return `${fmt(lat)},${fmt(lon)}`;
+                        }
                         return '';
                     }
                     // Escape quotes and wrap in quotes if contains comma
                     const stringValue = String(value).replace(/"/g, '""');
-                    return stringValue.includes(',') ? `"${stringValue}"` : stringValue;
+                    return stringValue.includes(delim) ? `"${stringValue}"` : stringValue;
                 });
-                csv += row.join(',') + '\n';
+                csv += row.join(delim) + '\n';
             });
             
             return csv;
-        }
-        
-        function previewExport() {
-            const format = document.getElementById('exportFormat').value;
-            showToast(`Preview for ${format.toUpperCase()} format`, 'info');
         }
         
         function refreshLogs() {
