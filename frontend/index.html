@@ -825,6 +825,12 @@
             return normalizedPath;
         }
 
+        function escHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
         function scheduleUiUpdate(data) {
             pendingUpdate = data;
             if (pendingRaf) return;
@@ -1395,7 +1401,7 @@
             showToast('Creating backup...', 'info');
             console.log('Starting backup...');
             
-            fetch('/api/backup', { 
+            fetch(apiUrl('/api/backup'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1442,7 +1448,7 @@
             console.log('Starting restore...');
             showToast('Restoring from latest backup...', 'info');
             
-            fetch('/api/restore', { 
+            fetch(apiUrl('/api/restore'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1984,7 +1990,29 @@
                     updateStatusIndicators({ server_connected: false });
                     fetchStatusUpdate();
                 });
-                
+
+                socket.on('ai_update', function(data) {
+                    // Server memberi tahu AI status berubah (setelah training / seed).
+                    // Simpan ke state global & muat ulang panel AI.
+                    window.lastServerStatus = Object.assign({}, window.lastServerStatus || {}, data || {});
+                    try { pollAiStatus(); } catch (e) {}
+                    try {
+                        const aiDetails = document.getElementById('ai-details');
+                        if (aiDetails && aiDetails.style.display !== 'none') {
+                            fetch(apiUrl('/api/ai/status'))
+                                .then(r => r.ok ? r.json() : null)
+                                .then(d => { if (d) window.lastServerStatus = Object.assign({}, window.lastServerStatus || {}, d); });
+                        }
+                    } catch (e) {}
+                });
+
+                socket.on('client_settings_update', function(settings) {
+                    if (settings && typeof settings === 'object') {
+                        clientSettings = Object.assign({}, clientSettings || {}, settings);
+                        try { applyClientSettingsToUI(); } catch (e) {}
+                    }
+                });
+
             } catch (error) {
                 console.error('âŒ Failed to initialize Socket.IO:', error);
                 // Don't show toast on initialization error to prevent spam
@@ -1996,6 +2024,7 @@
             // Temperature Chart
             const tempCtx = document.getElementById('tempChart');
             if (tempCtx) {
+                if (tempChart && typeof tempChart.destroy === 'function') tempChart.destroy();
                 tempChart = new Chart(tempCtx.getContext('2d'), {
                     type: 'line',
                     data: {
@@ -2038,6 +2067,7 @@
             // Humidity Chart
             const humCtx = document.getElementById('humidityChart');
 	            if (humCtx) {
+	                if (humidityChart && typeof humidityChart.destroy === 'function') humidityChart.destroy();
 	                humidityChart = new Chart(humCtx.getContext('2d'), {
 	                    type: 'line',
 	                    data: {
@@ -2080,6 +2110,7 @@
 	            // Air Quality Chart
 	            const airCtx = document.getElementById('airQualityChart');
 	            if (airCtx) {
+	                if (airChart && typeof airChart.destroy === 'function') airChart.destroy();
 	                airChart = new Chart(airCtx.getContext('2d'), {
 	                    type: 'line',
 	                    data: {
@@ -2122,6 +2153,7 @@
 	            // Light Intensity Chart
 	            const lightCtx = document.getElementById('lightChart');
 	            if (lightCtx) {
+	                if (lightChart && typeof lightChart.destroy === 'function') lightChart.destroy();
 	                lightChart = new Chart(lightCtx.getContext('2d'), {
 	                    type: 'line',
 	                    data: {
@@ -2304,8 +2336,8 @@
                     // Show banner only if we have an evaluation mode
                     bannerEl.style.display = evalSummary.mode ? 'block' : 'none';
                     bannerEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="display:flex;align-items:center">` +
-                        `<span class="${badgeClass}" style="margin-right:8px">${badgeText}</span>` +
-                        `<strong style="color:#fff">Evaluasi AI</strong></div><div style="font-size:13px;color:#cbd5e1">${msg}</div></div>`;
+                        `<span class="${badgeClass}" style="margin-right:8px">${escHtml(badgeText)}</span>` +
+                        `<strong style="color:#fff">Evaluasi AI</strong></div><div style="font-size:13px;color:#cbd5e1">${escHtml(msg)}</div></div>`;
 
                     // Apply a subtle class-based highlight rather than inlining styles
                     if (!trusted) {
@@ -2348,8 +2380,8 @@
                 } : {});
 
                 const parts = [];
-                parts.push(`<div><strong>Evaluasi:</strong> ${evalSummary.mode} • ${evalSummary.trusted ? 'Trusted' : 'Not trusted'}</div>`);
-                if (evalSummary.warnings && evalSummary.warnings.length) parts.push(`<div style="margin-top:6px;color:#fbbf24"><em>${evalSummary.warnings.join('; ')}</em></div>`);
+                parts.push(`<div><strong>Evaluasi:</strong> ${escHtml(evalSummary.mode)} • ${evalSummary.trusted ? 'Trusted' : 'Not trusted'}</div>`);
+                if (evalSummary.warnings && evalSummary.warnings.length) parts.push(`<div style="margin-top:6px;color:#fbbf24"><em>${escHtml(evalSummary.warnings.join('; '))}</em></div>`);
                 parts.push(`<div style="margin-top:8px"><strong>Distribusi (train/test):</strong></div>`);
                 const tableRows = [];
                 const labels = Object.keys(Object.assign({}, evalSummary.train_counts, evalSummary.test_counts));
@@ -2358,14 +2390,14 @@
                 labels.forEach(lbl => {
                     const t = evalSummary.train_counts[lbl] || 0;
                     const tt = evalSummary.test_counts[lbl] || 0;
-                    tableRows.push(`<tr><td style="padding:4px 6px">${lbl}</td><td style="padding:4px 6px;text-align:right">${t}</td><td style="padding:4px 6px;text-align:right">${tt}</td></tr>`);
+                    tableRows.push(`<tr><td style="padding:4px 6px">${escHtml(lbl)}</td><td style="padding:4px 6px;text-align:right">${escHtml(t)}</td><td style="padding:4px 6px;text-align:right">${escHtml(tt)}</td></tr>`);
                 });
                 tableRows.push('</table>');
                 parts.push(tableRows.join(''));
 
                 parts.push(`<div style="margin-top:8px"><strong>Metrics:</strong> Test acc: ${evalSummary.test_accuracy === null ? 'n/a' : Number(evalSummary.test_accuracy).toFixed(3)} • Macro F1: ${evalSummary.macro_f1 === null ? 'n/a' : Number(evalSummary.macro_f1).toFixed(3)} • Baseline: ${evalSummary.baseline_majority_accuracy === null ? 'n/a' : Number(evalSummary.baseline_majority_accuracy).toFixed(3)}</div>`);
-                parts.push(`<div style="margin-top:6px"><strong>Model:</strong> ${data.model_meta ? (data.model_meta.id || data.model_meta.version || data.model_meta.model_path) : '—'}</div>`);
-                parts.push(`<div style="margin-top:6px;color:#9ca3af;font-size:12px">Saved: ${data.model_meta ? (data.model_meta.saved_at || '—') : '—'}</div>`);
+                parts.push(`<div style="margin-top:6px"><strong>Model:</strong> ${escHtml(data.model_meta ? (data.model_meta.id || data.model_meta.version || data.model_meta.model_path) : '—')}</div>`);
+                parts.push(`<div style="margin-top:6px;color:#9ca3af;font-size:12px">Saved: ${escHtml(data.model_meta ? (data.model_meta.saved_at || '—') : '—')}</div>`);
 
                 detailsEl.innerHTML = parts.join('');
             }
@@ -2878,10 +2910,10 @@
                     return `
                         <div class="ai-hour">
                             <div class="ai-hour-top">
-                                <div class="ai-hour-time">${c.timeLabel}</div>
-                                <i class="fas ${icon} ai-hour-icon"></i>
+                                <div class="ai-hour-time">${escHtml(c.timeLabel)}</div>
+                                <i class="fas ${escHtml(icon)} ai-hour-icon"></i>
                             </div>
-                            <div class="ai-hour-type">${c.type}</div>
+                            <div class="ai-hour-type">${escHtml(c.type)}</div>
                             <div class="ai-hour-meta">
                                 <div>Hujan: <strong>${prob}%</strong></div>
                                 <div>Yakin: <strong>${conf}%</strong></div>

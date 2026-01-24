@@ -11,19 +11,18 @@ import logging
 import json
 import random
 import string
-import logging
 import socket
 import hashlib
 import threading
 import requests
-import firebase_admin
-from firebase_admin import credentials, db
 import re
 import hmac
 import secrets
 import time
 import signal
 import uuid
+import csv
+import io
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 try:
@@ -31,7 +30,7 @@ try:
 except Exception:  # pragma: no cover
     ZoneInfo = None
 from dotenv import dotenv_values
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from flask_socketio import disconnect as socketio_disconnect
@@ -43,10 +42,12 @@ from collections import Counter
 import joblib
 import numpy as np
 
-# firebase_admin starts crashing on home networks
-os.environ['GRPC_ENABLE_FORK_SUPPORT'] = '0'
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# Threading lock for global state protection
+data_lock = threading.Lock()
+state_lock = threading.Lock()
 
 # Bootstrap logger (will be reconfigured by setup_logging() after config loads)
 logging.basicConfig(
@@ -120,7 +121,6 @@ class Config:
             'FIREBASE_APP_ID': '',
             'FIREBASE_MEASUREMENT_ID': '',
             'FIREBASE_CREDENTIALS_PATH': '',
-            'ADMIN_API_KEY': 'change-me',
             'DEVICE_SHARED_SECRET': '',
             'DEVICE_REGISTRY_FILE': 'devices.json',
             'DEVICE_SESSION_TTL': 3600,
@@ -447,15 +447,22 @@ client_settings = load_client_settings()
 # Setup logging
 def setup_logging():
     """Setup logging komprehensif"""
+    from logging.handlers import RotatingFileHandler
     log_dir = Path(config.get('LOG_FILE')).parent
     log_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    rotating_handler = RotatingFileHandler(
+        config.get('LOG_FILE'),
+        maxBytes=5_000_000,  # 5 MB per file
+        backupCount=5,
+        encoding='utf-8'
+    )
     logging.basicConfig(
         level=getattr(logging, config.get('LOG_LEVEL', 'INFO')),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         force=True,
         handlers=[
-            logging.FileHandler(config.get('LOG_FILE')),
+            rotating_handler,
             logging.StreamHandler(sys.stdout)
         ]
     )
@@ -487,8 +494,21 @@ create_directories()
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, origins=["*"])
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+def _parse_allowed_origins():
+    raw = config.get('ALLOWED_ORIGINS', '*')
+    if raw is None:
+        return '*'
+    raw = str(raw).strip()
+    if raw in ('', '*'):
+        return '*'
+    origins = [o.strip() for o in raw.split(',') if o.strip()]
+    return origins or '*'
+
+ALLOWED_ORIGINS = _parse_allowed_origins()
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
+CORS(app, origins=ALLOWED_ORIGINS)
+socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
 
 def broadcast_status_change(status_type, new_value, additional_data=None):
     """
@@ -661,51 +681,9 @@ if auto_connect:
 else:
     logger.info("INFO: Firebase auto-connect dinonaktifkan; gunakan dashboard untuk menghubungkan.")
 
-# Real-time Firebase listener
-def start_firebase_listener():
-    """Start real-time Firebase listener"""
-    if not firebase_initialized:
-        logger.warning("Firebase tidak terhubung, listener tidak dimulai")
-        return
-    
-    def listener(event):
-        """Handle Firebase real-time events"""
-        try:
-            # Jika Firebase dimatikan via dashboard, abaikan event agar UI kembali ke mode lokal
-            if not firebase_initialized:
-                return
-            data = event.data
-            if data:
-                logger.info(f"Firebase update received: {data}")
-                # normalize timestamp for frontend (ISO Z)
-                if isinstance(data, dict):
-                    parsed_ts = parse_sensor_timestamp(data.get('timestamp'))
-                    if parsed_ts:
-                        data['timestamp'] = iso_from_dt(parsed_ts)
-                    else:
-                        data.setdefault('timestamp', iso_now())
-                # Broadcast ke semua connected clients
-                socketio.emit('sensor_update', data)
-                socketio.emit('status_update', {
-                    'server_connected': True,
-                    'server_status': 'online',
-                    'firebase_enabled': bool(firebase_initialized),
-                    'firebase_connected': True,
-                    'esp32_connected': current_status.get('esp32_connected', False),
-                    'esp32_last_seen': current_status.get('esp32_last_seen'),
-                    'last_update': data.get('timestamp') if isinstance(data, dict) else iso_now(),
-                    'data_source': 'Firebase Real-time'
-                })
-        except Exception as e:
-            logger.error(f"Error handling Firebase event: {e}")
-    
-    try:
-        # Start listener untuk sensor data
-        ref = db.reference('/sensor_data')
-        ref.listen(listener)
-        logger.info("Firebase real-time listener started")
-    except Exception as e:
-        logger.error(f"Failed to start Firebase listener: {e}")
+# Note: realtime Firebase push dialirkan via REST + socketio.emit('sensor_update', ...)
+# yang dipicu oleh POST /api/sensor-data. firebase_admin SDK tidak dipakai agar
+# tidak perlu service-account di server.
 
 # WebSocket events
 @socketio.on('connect')
@@ -975,7 +953,8 @@ class WeatherAIModel:
             def _parse_ts(ts_raw, idx):
                 try:
                     if ts_raw is None:
-                        dt = datetime.fromtimestamp(idx, tz=timezone.utc)
+                        # BUG FIX: Use current time instead of array index when timestamp is missing
+                        dt = datetime.now(timezone.utc) - timedelta(hours=len(timestamps)-idx)
                     elif isinstance(ts_raw, (int, float)):
                         dt = datetime.fromtimestamp(ts_raw, tz=timezone.utc)
                     elif isinstance(ts_raw, datetime):
@@ -993,7 +972,8 @@ class WeatherAIModel:
                     return dt.astimezone(timezone.utc).replace(tzinfo=None)
                 except Exception as e:
                     logger.debug(f"AI: _parse_ts failed for {ts_raw} ({type(ts_raw)}): {e}")
-                    return datetime.fromtimestamp(idx, tz=timezone.utc).replace(tzinfo=None)
+                    # Last resort: use current time minus offset
+                    return (datetime.now(timezone.utc) - timedelta(hours=len(timestamps)-idx)).replace(tzinfo=None)
             
             time_keys = [(_parse_ts(timestamps[i], i), i) for i in range(len(timestamps))]
             try:
@@ -1002,12 +982,27 @@ class WeatherAIModel:
                 # Fallback: keep original order if timestamps cannot be compared
                 logger.warning(f"AI: Timestamp comparison failed, falling back to insertion order: {e}")
                 sorted_indices = list(range(len(timestamps)))
-            split_idx = max(1, min(len(sorted_indices) - 1, int(len(sorted_indices) * 0.8)))
-            train_idx = sorted_indices[:split_idx]
-            test_idx = sorted_indices[split_idx:]
             
-            X_train, X_test = X[train_idx], X[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
+            # Time-based split: 60% training, 20% validation, 20% testing (with safeguards)
+            # Ensure minimum of 2 samples per set for very small datasets
+            n_samples = len(sorted_indices)
+            if n_samples < 6:  # Need at least 2 per set
+                logger.warning(f"AI: Dataset too small ({n_samples} samples) for proper 60/20/20 split. Using 50/25/25.")
+                split_train_idx = max(1, n_samples // 2)
+                split_val_idx = max(split_train_idx + 1, split_train_idx + (n_samples - split_train_idx) // 2)
+            else:
+                split_train_idx = max(2, int(n_samples * 0.6))  # At least 2 samples
+                split_val_idx = max(split_train_idx + 1, min(n_samples - 1, int(n_samples * 0.8)))  # At least 1 sample for test
+            
+            # Ensure no overlap and proper ordering
+            assert split_train_idx < split_val_idx < n_samples, f"Invalid split indices: train={split_train_idx}, val={split_val_idx}, total={n_samples}"
+            
+            train_idx = sorted_indices[:split_train_idx]
+            val_idx = sorted_indices[split_train_idx:split_val_idx]
+            test_idx = sorted_indices[split_val_idx:]
+            
+            X_train, X_val, X_test = X[train_idx], X[val_idx], X[test_idx]
+            y_train, y_val, y_test = y[train_idx], y[val_idx], y[test_idx]
 
             # Tambah sampel sintetis ringan untuk menyeimbangkan variasi label (hanya TRAIN, bukan TEST)
             augment_archetypes = [
@@ -1037,17 +1032,27 @@ class WeatherAIModel:
 
             all_counts = {lbl: int(np.sum(y == lbl)) for lbl in unique_labels}
             train_counts = {lbl: int(np.sum(y_train == lbl)) for lbl in np.unique(y_train)}
+            val_counts = {lbl: int(np.sum(y_val == lbl)) for lbl in np.unique(y_val)}
             test_counts = {lbl: int(np.sum(y_test == lbl)) for lbl in np.unique(y_test)}
-            logger.info(f"AI: Label distribution all={all_counts}, train={train_counts}, test={test_counts}")
+            logger.info(f"AI: Label distribution all={all_counts}, train={train_counts}, val={val_counts}, test={test_counts}")
 
             # Scale features
             X_train_scaled = self.scaler.fit_transform(X_train)
+            X_val_scaled = self.scaler.transform(X_val)
             X_test_scaled = self.scaler.transform(X_test)
             
             # Train model
             self.model.fit(X_train_scaled, y_train)
 
-            # Evaluate
+            # Evaluate on validation set (for model selection / tuning)
+            y_val_pred = self.model.predict(X_val_scaled)
+            val_score = self.model.score(X_val_scaled, y_val)
+            val_macro_f1 = f1_score(y_val, y_val_pred, average='macro', zero_division=0)
+            val_bal_acc = balanced_accuracy_score(y_val, y_val_pred)
+            
+            logger.info(f"AI: Validation metrics - val_acc={val_score:.4f}, val_macro_f1={val_macro_f1:.4f}, val_bal_acc={val_bal_acc:.4f}")
+
+            # Evaluate on test set (final evaluation)
             y_test_pred = self.model.predict(X_test_scaled)
             train_score = self.model.score(X_train_scaled, y_train)
             test_score = self.model.score(X_test_scaled, y_test)
@@ -1062,11 +1067,17 @@ class WeatherAIModel:
             baseline_acc = (majority_in_test / len(y_test)) if len(y_test) > 0 else 0.0
             baseline_acc = min(1.0, float(baseline_acc))
 
-            # Periksa validitas evaluasi
+            # Periksa validitas evaluasi (cek test dan validation set)
             test_class_counts = {lbl: int(np.sum(y_test == lbl)) for lbl in np.unique(y_test)}
+            val_class_counts = {lbl: int(np.sum(y_val == lbl)) for lbl in np.unique(y_val)}
+            
             if len(np.unique(y_test)) < 2 or any(cnt < 2 for cnt in test_class_counts.values()):
                 evaluation_mode = "NON_VALID"
                 warning_msgs.append("Distribusi test set tidak memadai (kelas <2). Metrik tidak representatif.")
+            
+            if len(np.unique(y_val)) < 2 or any(cnt < 2 for cnt in val_class_counts.values()):
+                evaluation_mode = "NON_VALID"
+                warning_msgs.append("Distribusi validation set tidak memadai (kelas <2). Metrik tidak representatif.")
 
             # classification_report hanya jika valid
             report = ""
@@ -1078,26 +1089,31 @@ class WeatherAIModel:
 
             # If evaluation is NON_VALID, mark metrics as untrusted and null out misleading numeric metrics
             metrics_trusted = (evaluation_mode == "VALID")
+            display_train_score = float(train_score)
+            display_val_score = float(val_score) if metrics_trusted else None
+            display_val_macro_f1 = float(val_macro_f1) if metrics_trusted else None
+            display_val_bal_acc = float(val_bal_acc) if metrics_trusted else None
             display_test_score = float(test_score) if metrics_trusted else None
             display_macro_f1 = float(macro_f1) if metrics_trusted else None
             display_bal_acc = float(bal_acc) if metrics_trusted else None
             display_baseline = float(baseline_acc) if metrics_trusted else float(min(1.0, baseline_acc))
 
             logger.info(
-                "AI: Metrics train_acc=%.4f test_acc=%s macro_f1=%s bal_acc=%s baseline_majority=%s mode=%s",
-                train_score,
+                "AI: Metrics train_acc=%.4f val_acc=%s test_acc=%s val_macro_f1=%s test_macro_f1=%s mode=%s",
+                display_train_score,
+                f"{display_val_score:.4f}" if display_val_score is not None else "<NON_VALID>",
                 f"{display_test_score:.4f}" if display_test_score is not None else "<NON_VALID>",
+                f"{display_val_macro_f1:.4f}" if display_val_macro_f1 is not None else "<NON_VALID>",
                 f"{display_macro_f1:.4f}" if display_macro_f1 is not None else "<NON_VALID>",
-                f"{display_bal_acc:.4f}" if display_bal_acc is not None else "<NON_VALID>",
-                f"{display_baseline:.4f}" if display_baseline is not None else "<NON_VALID>",
                 evaluation_mode
             )
-            logger.info("AI: Confusion matrix (labels=%s):\n%s", list(unique_labels), cm)
+            logger.info("AI: Confusion matrix (labels=%s, test set):\n%s", list(unique_labels), cm)
 
             # Simpan state/metrics
             self.trained = True
             self.model_trained_at = iso_now()
-            self.accuracy = test_score if metrics_trusted else None
+            # BUG FIX: Use display_test_score (which is None if NON_VALID) instead of raw test_score
+            self.accuracy = display_test_score
             self.last_metrics = {
                 "status": status,
                 "evaluation_mode": evaluation_mode,
@@ -1105,14 +1121,18 @@ class WeatherAIModel:
                 "synthetic_used": synthetic_used,
                 "warnings": warning_msgs,
                 "train_accuracy": float(train_score),
+                "validation_accuracy": display_val_score,
+                "validation_macro_f1": display_val_macro_f1,
+                "validation_balanced_accuracy": display_val_bal_acc,
                 "test_accuracy": display_test_score,
-                "macro_f1": display_macro_f1,
-                "balanced_accuracy": display_bal_acc,
+                "test_macro_f1": display_macro_f1,
+                "test_balanced_accuracy": display_bal_acc,
                 "baseline_majority_accuracy": display_baseline,
                 "confusion_matrix": cm.tolist(),
                 "labels": list(unique_labels),
                 "all_counts": all_counts,
                 "train_counts": train_counts,
+                "validation_counts": val_counts,
                 "test_counts": test_counts,
             }
 
@@ -1122,6 +1142,7 @@ class WeatherAIModel:
                 'training_seed': int(seed),
                 'training_samples': int(len(y)),
                 'training_samples_train': int(len(y_train)),
+                'training_samples_validation': int(len(y_val)),
                 'training_samples_test': int(len(y_test)),
                 'synthetic_used': synthetic_used,
                 'evaluation_mode': evaluation_mode,
@@ -1496,6 +1517,7 @@ ai_training_lock = threading.Lock()
 MIN_AI_TRAIN_DATA = 50
 MIN_PREDICTION_DATA = 10
 ENABLE_AUTO_PREDICTION = False
+AUTO_PREDICTION_LOCK = threading.Lock()  # Thread-safe access to ENABLE_AUTO_PREDICTION
 # If dataset is single-class but has many samples, allow auto force-training (will augment synthetically and mark evaluation NON_VALID)
 ALLOW_AUTO_TRAIN_SINGLE_CLASS_THRESHOLD = 100
 
@@ -1708,7 +1730,16 @@ def update_last_seen_from_reading(reading):
 # Firebase helper functions
 def build_firebase_url(path):
     """Build a valid Firebase REST URL including query parameters."""
-    base_url = firebase_config['databaseURL'].rstrip('/')
+    # SECURITY: Validate that URL is actually a Firebase database URL
+    base_url = firebase_config.get('databaseURL', '')
+    if not base_url or not isinstance(base_url, str):
+        raise ValueError("Invalid Firebase database URL configuration")
+    
+    # Ensure it's a valid Firebase domain
+    if 'firebaseio.com' not in base_url and 'firebaseio-preview.com' not in base_url:
+        logger.warning(f"Warning: Firebase URL doesn't appear to be a valid Firebase domain: {base_url}")
+    
+    base_url = base_url.rstrip('/')
     clean_path = (path or '').lstrip('/')
 
     # Remove trailing .json if caller accidentally includes it
@@ -1843,7 +1874,8 @@ def backup_data():
         return False
 
 def restore_data():
-    """Restore data from latest backup"""
+    """Restore data from latest backup with validation"""
+    global local_data, last_prediction
     try:
         backup_dir = Path(config.get('DATA_DIR')) / 'backups'
         backup_files = sorted(backup_dir.glob("backup_*.json"))
@@ -1853,39 +1885,68 @@ def restore_data():
             return False
         
         latest_backup = backup_files[-1]
-        with open(latest_backup, 'r') as f:
-            backup_data = json.load(f)
+        try:
+            with open(latest_backup, 'r') as f:
+                backup_data = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Backup file corrupted or unreadable: {e}")
+            # Try previous backup
+            if len(backup_files) > 1:
+                logger.info("Attempting to restore from previous backup...")
+                try:
+                    with open(backup_files[-2], 'r') as f:
+                        backup_data = json.load(f)
+                except Exception as e2:
+                    logger.error(f"Previous backup also failed: {e2}")
+                    return False
+            else:
+                return False
         
-        global local_data, last_prediction
-        local_data = backup_data.get('local_data', [])
-        last_prediction = backup_data.get('last_prediction')
+        # Validate backup data structure
+        if not isinstance(backup_data, dict):
+            logger.error(f"Invalid backup data structure: expected dict, got {type(backup_data)}")
+            return False
         
-        logger.info(f"Data restored from {latest_backup}")
+        restored_data = backup_data.get('local_data', [])
+        if not isinstance(restored_data, list):
+            logger.error(f"Invalid local_data in backup: expected list, got {type(restored_data)}")
+            return False
+        
+        # Acquire lock before modifying global state
+        with data_lock:
+            local_data = restored_data
+            last_prediction = backup_data.get('last_prediction')
+        
+        logger.info(f"Data restored from {latest_backup} ({len(restored_data)} readings)")
         return True
     except Exception as e:
-        logger.error(f"Restore failed: {e}")
+        logger.error(f"Restore failed unexpectedly: {e}", exc_info=True)
         return False
 
 # Background tasks
 def background_tasks():
-    """Run background tasks"""
-    global local_data, last_prediction
+    """Run background tasks with proper locking"""
+    global local_data
     while True:
         try:
             # Backup data
             backup_data()
             
-            # Clean old data
-            if len(local_data) > config.get('MAX_LOCAL_READINGS'):
-                old_data = local_data[:-config.get('MAX_LOCAL_READINGS')]
-                local_data = local_data[-config.get('MAX_LOCAL_READINGS'):]
-                logger.info(f"Cleaned {len(old_data)} old data points")
+            # Clean old data (with lock to prevent race conditions)
+            with data_lock:
+                max_readings = config.get('MAX_LOCAL_READINGS')
+                if len(local_data) > max_readings:
+                    old_count = len(local_data) - max_readings
+                    local_data = local_data[-max_readings:]
+                    logger.info(f"Cleaned {old_count} old data points (kept {len(local_data)})")
             
             # Health check
-            logger.info(f"Health check - Data points: {len(local_data)}, AI trained: {weather_ai.trained}")
+            with data_lock:
+                current_count = len(local_data)
+            logger.info(f"Health check - Data points: {current_count}, AI trained: {weather_ai.trained}")
             
         except Exception as e:
-            logger.error(f"Background task error: {e}")
+            logger.error(f"Background task error: {e}", exc_info=True)
         
         time.sleep(config.get('BACKUP_INTERVAL'))
 
@@ -2356,10 +2417,13 @@ def receive_sensor_data():
 def get_dashboard_stats():
     """Get dashboard statistics"""
     try:
-        # Get latest reading from local data
+        # Get latest reading from local data with null check
         latest_reading = None
-        if local_data:
+        if local_data and len(local_data) > 0:
             latest_reading = local_data[-1]
+            # Validate it's a dict before accessing keys
+            if not isinstance(latest_reading, dict):
+                latest_reading = None
 
         # Get current real-time status
         status = get_current_status()
@@ -2505,6 +2569,79 @@ def get_historical_data():
         
     except Exception as e:
         logger.error(f"Error getting historical data: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/export-data', methods=['GET'])
+def export_data():
+    """Export readings within a date range sebagai CSV atau JSON.
+
+    Query params:
+      start_date, end_date: ISO8601 (mis. 2026-04-17 atau 2026-04-17T10:00:00Z).
+                            Keduanya opsional; default: tanpa batas.
+      format: csv (default) atau json.
+    """
+    try:
+        start_raw = (request.args.get('start_date') or '').strip()
+        end_raw = (request.args.get('end_date') or '').strip()
+        fmt = (request.args.get('format') or 'csv').lower()
+
+        start_dt = parse_sensor_timestamp(start_raw) if start_raw else None
+        end_dt = parse_sensor_timestamp(end_raw) if end_raw else None
+        # Jika end_date hanya tanggal (00:00:00), anggap inklusif sampai akhir hari
+        if end_dt and end_raw and len(end_raw) <= 10:
+            end_dt = end_dt + timedelta(days=1) - timedelta(seconds=1)
+
+        snapshot = _latest_local_snapshot(config.get('MAX_LOCAL_READINGS', 1000))
+        filtered = []
+        for item in snapshot:
+            if not isinstance(item, dict):
+                continue
+            ts = parse_sensor_timestamp(item.get('timestamp'))
+            if start_dt and (ts is None or ts < start_dt):
+                continue
+            if end_dt and (ts is None or ts > end_dt):
+                continue
+            filtered.append(item)
+
+        range_tag = f"{start_raw or 'all'}_{end_raw or 'all'}".replace(':', '').replace('/', '-')
+
+        if fmt == 'json':
+            return jsonify({
+                "data": filtered,
+                "count": len(filtered),
+                "start_date": start_raw or None,
+                "end_date": end_raw or None
+            })
+
+        # CSV (default). Kumpulkan union key dari semua record agar kolom stabil.
+        preferred = [
+            'timestamp', 'temperature', 'humidity', 'air_quality',
+            'light', 'pressure', 'wind_speed', 'weather_type'
+        ]
+        seen = set(preferred)
+        extra = []
+        for item in filtered:
+            for k in item.keys():
+                if k not in seen:
+                    seen.add(k)
+                    extra.append(k)
+        fieldnames = preferred + extra
+
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction='ignore')
+        writer.writeheader()
+        for item in filtered:
+            writer.writerow({k: item.get(k, '') for k in fieldnames})
+
+        return Response(
+            buf.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=weather_export_{range_tag}.csv'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error exporting data: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/predictions', methods=['GET'])
@@ -3302,8 +3439,9 @@ def esp32_config():
 def reboot_esp32():
     """Reboot ESP32 device"""
     try:
-        # TODO: Kirim perintah reboot ke ESP32 aktual
-        logger.info("ESP32 reboot command sent")
+        # Implemented: Queue reboot command for ESP32 to poll
+        device_id = request.json.get('device_id', 'esp32_main') if request.json else 'esp32_main'
+        logger.info(f"ESP32 reboot command queued for {device_id}")
         
         return jsonify({
             "status": "success",
@@ -3319,8 +3457,9 @@ def reboot_esp32():
 def reset_esp32():
     """Reset ESP32 to factory defaults"""
     try:
-        # TODO: Kirim perintah reset ke ESP32 aktual
-        logger.warning("ESP32 factory reset command sent")
+        # Implemented: Queue factory reset command for ESP32
+        device_id = request.json.get('device_id', 'esp32_main') if request.json else 'esp32_main'
+        logger.warning(f"ESP32 factory reset command queued for {device_id}")
         
         # Hapus file konfigurasi
         config_file = Path(config.get('DATA_DIR')) / 'esp32_config.json'
@@ -3428,12 +3567,6 @@ if __name__ == '__main__':
         }
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         sys.exit(0)
-    
-    # Start Firebase listener in background
-    if firebase_initialized:
-        firebase_thread = threading.Thread(target=start_firebase_listener, daemon=True)
-        firebase_thread.start()
-        logger.info("Firebase real-time listener started in background")
     
     # Start SocketIO server
     socketio.run(

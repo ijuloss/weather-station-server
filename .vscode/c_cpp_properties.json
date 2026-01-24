@@ -1,0 +1,33 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/cores/esp32",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/libraries/**",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/variants/esp32",
+                "C:/Users/opera/OneDrive/Documents/Arduino/libraries/**",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2507/xtensa-esp-elf/include/c++/14.2.0",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2507/xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2507/xtensa-esp-elf/include",
+                "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2507/lib/gcc/xtensa-esp-elf/14.2.0/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "ARDUINO=10800",
+                "ESP32",
+                "ARDUINO_ARCH_ESP32",
+                "ESP_PLATFORM"
+            ],
+            "compilerPath": "C:/Users/opera/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2507/bin/xtensa-esp32-elf-g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64",
+            "configurationProvider": "vsciot-vscode.vscode-arduino"
+        }
+    ],
+    "version": 4
+}
