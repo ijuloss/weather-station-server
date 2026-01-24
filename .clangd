@@ -1,0 +1,22 @@
+CompileFlags:
+  Add: [
+    "-IWEATHER_STATION_UNIFIED_v1_1_2",
+    "-IC:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/cores/esp32",
+    "-IC:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/variants/esp32",
+    "-IC:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/libraries/WiFi/src",
+    "-IC:/Users/opera/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.3.4/libraries/Preferences/src",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/ArduinoJson/src",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/WiFiManager",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/U8g2/src",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/Adafruit_INA219",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/Adafruit_SHT31_Library",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/BH1750/src",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/TinyGPSPlus-ESP32/src",
+    "-IC:/Users/opera/OneDrive/Documents/Arduino/libraries/ESP_QRcode/src",
+    "-DESP32",
+    "-DARDUINO=10800",
+    "-DARDUINO_ARCH_ESP32",
+    "-DESP_PLATFORM",
+    "-DPROGMEM=",
+    "--target=xtensa-esp32-elf"
+  ]
