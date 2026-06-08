@@ -227,7 +227,11 @@ static uint32_t g_commandPollIntervalSec =
 // Local refresh intervals (do not affect server interval unless you change
 // g_sensorIntervalSec)
 static uint32_t g_sensorReadPeriodMs = 400; // read sensors for OLED/serial (ms)
+<<<<<<< HEAD
 static uint32_t g_oledIntervalMs = 700;     // OLED refresh (ms)
+=======
+static uint32_t g_oledIntervalMs = 100;     // OLED refresh (ms)
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
 
 // OLED paging
 static bool g_oledEnabled = true;
@@ -250,9 +254,13 @@ static bool g_wifiEnabled = true; // allow WiFi connect/maintain
 static char g_wifiSsid[33] = {0}; // optional manual SSID (if set)
 static char g_wifiPass[65] = {0}; // optional manual PASS (if set)
 
+<<<<<<< HEAD
 // TLS: default secure. Root CA dapat di-embed via WiFiClientSecure::setCACert(...).
 // Untuk deploy LAN yang HTTPS-nya self-signed, override lewat NVS key "tls_insecure".
 static bool g_tlsInsecure = false;
+=======
+static bool g_tlsInsecure = true;
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
 
 // Realtime serial
 static bool g_rtEnabled = false;
@@ -447,14 +455,22 @@ static void prefsLoad() {
   prefs.getString(KEY_SERVER_URL, g_serverUrl, sizeof(g_serverUrl));
   prefs.getString(KEY_DEVICE_ID, g_deviceId, sizeof(g_deviceId));
   prefs.getString(KEY_SECRET, g_sharedSecret, sizeof(g_sharedSecret));
+<<<<<<< HEAD
   g_tlsInsecure = prefs.getBool(KEY_TLS_INSEC, false);
+=======
+  g_tlsInsecure = prefs.getBool(KEY_TLS_INSEC, true);
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
 
   g_oledEnabled = prefs.getBool(KEY_OLED_EN, true);
   g_oledFlip = (uint8_t)prefs.getUChar(KEY_OLED_FLIP, 0);
   g_oledContrast = (uint8_t)prefs.getUChar(KEY_OLED_CONTR, 255);
   g_oledAutoPage = prefs.getBool(KEY_OLED_AUTO, true);
   g_oledPage = (uint8_t)prefs.getUChar(KEY_OLED_PAGE, 0);
+<<<<<<< HEAD
   g_oledIntervalMs = (uint32_t)prefs.getUInt(KEY_OLED_REF_MS, 700);
+=======
+  g_oledIntervalMs = (uint32_t)prefs.getUInt(KEY_OLED_REF_MS, 100);
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
   g_oledPageIntervalMs = (uint32_t)prefs.getUInt(KEY_OLED_PG_MS, 5000);
 
   g_wifiEnabled = prefs.getBool(KEY_WIFI_EN, true);
@@ -481,8 +497,13 @@ static void prefsLoad() {
     g_oledPage = 0;
   if (g_oledContrast < 5)
     g_oledContrast = 5;
+<<<<<<< HEAD
   if (g_oledIntervalMs < 200)
     g_oledIntervalMs = 200;
+=======
+  if (g_oledIntervalMs < 50)
+    g_oledIntervalMs = 50;
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
   if (g_oledIntervalMs > 2000)
     g_oledIntervalMs = 2000;
   if (g_oledPageIntervalMs < 800)
@@ -1007,6 +1028,7 @@ static void oledDraw() {
   u8g2.setContrast(g_oledContrast);
   u8g2.clearBuffer();
 
+<<<<<<< HEAD
   // ===================== HEADER/STATUS BAR =====================
   // Layout: [WiFi 16px] [SSID ~40px] [Server 24px] [Battery 18px + %]
   
@@ -1038,10 +1060,41 @@ static void oledDraw() {
     u8g2.setMaxClipWindow();
   } else {
     // Center text if fits
+=======
+  // ===================== HEADER/STATUS BAR (0-16px) =====================
+  // Center Y for 16px header is 8.
+  
+  // 1. WiFi icon (16x14) - y=1 to center (1..15)
+  int rssi = WiFi.isConnected() ? WiFi.RSSI() : -100;
+  const uint8_t* wifiIcon = icon_wifi_0;
+  if (rssi > -55) wifiIcon = icon_wifi_3;       
+  else if (rssi > -70) wifiIcon = icon_wifi_2;  
+  else if (rssi > -85) wifiIcon = icon_wifi_1;  
+  u8g2.drawXBMP(0, 1, 16, 14, wifiIcon);
+
+  // 2. SSID Scrolling Text
+  u8g2.setFont(u8g2_font_5x7_tf);
+  String ssid = WiFi.isConnected() ? WiFi.SSID() : "Nosignal";
+  int ssidW = u8g2.getStrWidth(ssid.c_str());
+  const int ssidBoxX = 18;
+  const int ssidBoxW = 46; // Center area
+  
+  if (ssidW > ssidBoxW) {
+    if (now - g_lastSsidScrollMs > 50) { 
+      g_ssidScrollX--;
+      if (g_ssidScrollX < -(ssidW + 15)) g_ssidScrollX = ssidBoxW;
+      g_lastSsidScrollMs = now;
+    }
+    u8g2.setClipWindow(ssidBoxX, 0, ssidBoxX + ssidBoxW, 16);
+    u8g2.drawStr(ssidBoxX + g_ssidScrollX, 11, ssid.c_str());
+    u8g2.setMaxClipWindow();
+  } else {
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
     int cx = ssidBoxX + (ssidBoxW - ssidW) / 2;
     u8g2.drawStr(cx, 11, ssid.c_str());
   }
 
+<<<<<<< HEAD
   // --- 3. Server Connection Status (Bar-style icon, 20x12 pixels) ---
   u8g2.drawXBMP(64, 1, 20, 12, icon_server);
   // Show X overlay if server connection failed (blinking)
@@ -1252,6 +1305,142 @@ static void oledDraw() {
       } else {
         u8g2.print("---");
       }
+=======
+  // 3. Server connection (20x12) - y=2 to center (2..14)
+  u8g2.drawXBMP(66, 2, 20, 12, icon_server);
+  if (!g_lastPostOk && (now % 1000 < 500)) {
+    u8g2.drawLine(66, 2, 85, 14);
+    u8g2.drawLine(85, 2, 66, 14);
+  }
+
+  // 4. Battery (18x10 including tip) - y=3 to center (3..13)
+  const int batX = 98;
+  const int batY = 3;
+  const int batW = 18;
+  const int batH = 10;
+  
+  u8g2.drawFrame(batX, batY, batW - 2, batH);
+  u8g2.drawBox(batX + batW - 2, batY + 3, 2, 4);      
+  
+  int pct = getBattPct(g_lastReading.battery_voltage);
+  int fillW = ((batW - 6) * pct) / 100;
+  if (fillW > 12) fillW = 12;
+  if (fillW < 0) fillW = 0;
+  if (fillW > 0) u8g2.drawBox(batX + 2, batY + 2, fillW, batH - 4);
+
+  if (isfinite(g_lastReading.current_mA) && g_lastReading.current_mA > 5.0f) {
+    u8g2.setDrawColor(2); 
+    u8g2.drawXBMP(batX + 5, batY + 0, 6, 10, icon_bolt_small);
+    u8g2.setDrawColor(1);
+  }
+  
+  u8g2.setFont(u8g2_font_4x6_tf);
+  String pStr = String(pct) + "%";
+  u8g2.drawStr(batX + (batW - u8g2.getStrWidth(pStr.c_str()))/2, 22, pStr.c_str());
+
+  u8g2.drawHLine(0, 16, 128);
+
+  // ===================== PAGE CONTENT =====================
+  const int cY = 18; 
+
+  switch (g_oledPage) {
+    case 0: // PAGE 1: ENVIRONMENT
+    {
+      u8g2.drawXBMP(2, cY, 16, 16, icon_temp_16x16);
+      u8g2.setFont(u8g2_font_6x12_tr);
+      u8g2.setCursor(20, cY + 13);
+      if (isfinite(g_lastReading.temperature)) {
+        u8g2.print(g_lastReading.temperature, 1); u8g2.print("\260C"); 
+      } else u8g2.print("--");
+
+      u8g2.drawXBMP(66, cY, 16, 16, icon_air_16x16);
+      u8g2.setCursor(84, cY + 13);
+      u8g2.print(g_lastReading.air_quality);
+      u8g2.setFont(u8g2_font_4x6_tf); u8g2.print(" ppm");
+
+      const int row2Y = cY + 22;
+      u8g2.drawXBMP(2, row2Y, 16, 16, icon_hum_16x16);
+      u8g2.setFont(u8g2_font_6x12_tr);
+      u8g2.setCursor(20, row2Y + 13);
+      if (isfinite(g_lastReading.humidity)) {
+        u8g2.print(g_lastReading.humidity, 1); u8g2.print("%");
+      } else u8g2.print("--");
+
+      u8g2.drawXBMP(66, row2Y, 16, 16, icon_sun_16x16);
+      u8g2.setCursor(84, row2Y + 13);
+      if (isfinite(g_lastReading.light_lux)) {
+        float lx = g_lastReading.light_lux;
+        if (lx > 9999) { u8g2.print((int)(lx/1000)); u8g2.print("k"); }
+        else u8g2.print((int)lx);
+      } else u8g2.print("--");
+      u8g2.setFont(u8g2_font_4x6_tf); u8g2.print(" lux");
+      break;
+    }
+
+    case 1: // PAGE 2: GPS
+    {
+      u8g2.setFont(u8g2_font_5x7_tf);
+      int y = cY + 7;
+      u8g2.drawStr(0, y, "GPS    : "); u8g2.print(g_lastReading.gps_valid ? "Fix" : "No Fix");
+      
+      y += 9; u8g2.drawStr(0, y, "Lat    : ");
+      if (g_lastReading.gps_valid) u8g2.print(g_lastReading.lat, 6); else u8g2.print("-");
+      
+      y += 9; u8g2.drawStr(0, y, "Lng    : ");
+      if (g_lastReading.gps_valid) u8g2.print(g_lastReading.lng, 6); else u8g2.print("-");
+      
+      y += 9; u8g2.drawStr(0, y, "Lokasi :");
+      
+      u8g2.setFont(u8g2_font_4x6_tf); 
+      y += 7; u8g2.setCursor(0, y); u8g2.print("Jalan Sidotopo Lor I,");
+      y += 7; u8g2.setCursor(0, y); u8g2.print("Surabaya, Jawa Timur");
+      
+      u8g2.drawXBMP(112, cY + 4, 16, 16, icon_pin_16x16);
+      break;
+    }
+
+    case 2: // PAGE 3: POWER
+    {
+      u8g2.setFont(u8g2_font_6x12_tr);
+      int y = cY + 12;
+      u8g2.drawStr(0, y, "Tegangan : "); 
+      if (isfinite(g_lastReading.bus_voltage)) {
+        u8g2.print(g_lastReading.bus_voltage, 2); u8g2.print("V");
+      } else u8g2.print("--");
+      
+      y += 14; u8g2.drawStr(0, y, "Arus     : "); 
+      if (isfinite(g_lastReading.current_mA)) {
+        u8g2.print(g_lastReading.current_mA, 0); u8g2.print("mA");
+      } else u8g2.print("--");
+      
+      y += 14; u8g2.drawStr(0, y, "Daya     : "); 
+      if (isfinite(g_lastReading.power_mW)) {
+        u8g2.print(g_lastReading.power_mW, 0); u8g2.print("mW");
+      } else u8g2.print("--");
+      
+      u8g2.drawXBMP(112, cY + 6, 16, 16, icon_light_16x16);
+      break;
+    }
+
+    case 3: // PAGE 4: SYSTEM
+    {
+      u8g2.setFont(u8g2_font_5x7_tf);
+      int y = cY + 8;
+      u8g2.drawStr(0, y, "Web  : ws.ijuloss.my.id");
+      
+      y += 10; u8g2.drawStr(0, y, "IP   : ");
+      if (WiFi.isConnected()) u8g2.print(WiFi.localIP().toString().c_str());
+      else u8g2.print("Offline");
+      
+      y += 10; u8g2.drawStr(0, y, "HTTP : ");
+       if (g_lastPostCode > 0) {
+        u8g2.print(g_lastPostCode);
+        if (g_lastPostCode == 200) u8g2.print(" OK");
+        else if (g_lastPostCode == 500) u8g2.print(" Err");
+       } else u8g2.print("---");
+       
+      u8g2.drawXBMP(108, cY + 4, 16, 16, icon_globe_16x16);
+>>>>>>> 1a7ee6b4cea1c1879d1b19bf4bcf70de22a15a22
       break;
     }
   }

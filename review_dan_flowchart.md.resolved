@@ -1,0 +1,628 @@
+# Review dan Flowchart: Weather Station Server
+
+## 📋 Ringkasan Sistem
+
+**Weather Station Server** adalah sistem backend berbasis Flask yang menerima data sensor cuaca dari perangkat ESP32, menyimpan data secara lokal dan/atau di Firebase, serta menggunakan AI (Random Forest) untuk prediksi cuaca.
+
+---
+
+## 🏗️ ARSITEKTUR SISTEM
+
+### Diagram 1: Arsitektur Tingkat Tinggi
+
+```mermaid
+graph LR
+    A[ESP32] --> B[Nginx]
+    C[Browser] --> B
+    B --> D[Flask]
+    D --> E[(Local DB)]
+    D --> F[(Firebase)]
+    D --> C
+```
+
+**Penjelasan Arsitektur:**
+| No | Komponen | Port | Fungsi |
+|----|----------|------|--------|
+| A | ESP32 | - | Perangkat sensor cuaca |
+| B | Nginx | 9999 | Reverse proxy |
+| C | Browser | - | Dashboard web |
+| D | Flask | 1111 | Backend server |
+| E | Local DB | - | Penyimpanan lokal JSON |
+| F | Firebase | - | Cloud database (opsional) |
+
+**Alur Data:**
+1. ESP32 mengirim data sensor → Nginx
+2. Browser mengakses dashboard → Nginx
+3. Nginx meneruskan ke Flask server
+4. Flask menyimpan ke Local DB dan Firebase
+5. Flask mengirim update real-time ke Browser
+
+---
+
+### Diagram 2: Komponen Backend
+
+```mermaid
+graph TB
+    A[Flask Server]
+    
+    B[Config Manager]
+    C[Device Registry]
+    D[Client Settings]
+    
+    E[Random Forest]
+    F[Fuzzy Forecast]
+    G[Model Trainer]
+    
+    H[Validator]
+    I[Normalizer]
+    J[Broadcaster]
+    
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    A --> G
+    A --> H
+    A --> I
+    A --> J
+```
+
+**Penjelasan Komponen Backend:**
+| Kategori | Komponen | Fungsi |
+|----------|----------|--------|
+| **Core** | Config Manager | Mengelola konfigurasi server |
+| **Core** | Device Registry | Menyimpan daftar device ESP32 |
+| **Core** | Client Settings | Pengaturan dashboard |
+| **AI/ML** | Random Forest | Model klasifikasi cuaca |
+| **AI/ML** | Fuzzy Forecast | Prediksi berbasis aturan |
+| **AI/ML** | Model Trainer | Proses training model |
+| **Process** | Validator | Validasi data sensor |
+| **Process** | Normalizer | Normalisasi nilai sensor |
+| **Process** | Broadcaster | Kirim status ke client |
+
+---
+
+## 🔄 ALUR DATA
+
+### Diagram 3: Alur Data Sensor (Sederhana)
+
+```mermaid
+graph LR
+    A[1. ESP32] --> B[2. Nginx]
+    B --> C[3. Flask]
+    C --> D[4. Validate]
+    D --> E[5. Store]
+    E --> F[6. Broadcast]
+    F --> G[7. Dashboard]
+```
+
+**Penjelasan Alur Data (7 langkah):**
+| Step | Komponen | Aksi |
+|------|----------|------|
+| 1 | ESP32 | Kirim data sensor via POST |
+| 2 | Nginx | Terima request, forward ke Flask |
+| 3 | Flask | Proses request |
+| 4 | Validate | Validasi field wajib dan format |
+| 5 | Store | Simpan ke Local DB dan Firebase |
+| 6 | Broadcast | Kirim event via WebSocket |
+| 7 | Dashboard | Terima update, refresh UI |
+
+---
+
+### Diagram 4: Alur Penerimaan Data Detail
+
+**Langkah-langkah Penerimaan Data Sensor:**
+
+| No | Dari | Ke | Aksi |
+|----|------|-----|------|
+| 1 | ESP32 | Server | POST /api/sensor-data dengan payload JSON |
+| 2 | Server | Server | Validasi: cek field wajib (device_id, temp, humidity, dll) |
+| 3 | Server | Server | Normalisasi: konversi satuan, koreksi range |
+| 4 | Server | Local DB | Simpan data ke memory |
+| 5 | Server | Firebase | Sync ke cloud (jika aktif) |
+| 6 | Server | Dashboard | Kirim event 'sensor_update' via WebSocket |
+| 7 | Server | Server | Generate prediksi AI + Fuzzy |
+| 8 | Server | ESP32 | Response 200 OK dengan data_id dan prediction |
+| 9 | Dashboard | Dashboard | Update tampilan UI secara real-time |
+
+**Payload Contoh:**
+```json
+{
+  "device_id": "esp32-1",
+  "temperature": 28.5,
+  "humidity": 65,
+  "air_quality": 45,
+  "light_intensity": 12000,
+  "battery_voltage": 4.1
+}
+```
+
+---
+
+### Diagram 5: WebSocket Real-time
+
+**Alur Koneksi WebSocket:**
+
+| No | Event | Dari | Ke | Deskripsi |
+|----|-------|------|-----|-----------|
+| 1 | connect | Browser | Server | Browser membuka koneksi WebSocket |
+| 2 | status_update | Server | Browser | Server kirim status terkini |
+| 3 | sensor_update | Server | Browser | Setiap data baru dari ESP32 |
+| 4 | status_update | Server | Browser | Perubahan status Firebase/ESP32 |
+| 5 | disconnect | Browser | Server | Browser menutup koneksi |
+
+**Event yang Tersedia:**
+- `sensor_update` → data sensor baru
+- `status_update` → perubahan status koneksi
+- `client_settings_update` → perubahan pengaturan
+- `training_progress` → progress training AI
+
+---
+
+## 🧠 ALUR TRAINING MODEL AI
+
+### Diagram 6: Flowchart Training
+
+```mermaid
+graph TD
+    A[Start] --> B{Data >= 50?}
+    B -->|No| C[Error: Data Kurang]
+    B -->|Yes| D[Prepare Data]
+    D --> E[Generate Labels]
+    E --> F{Variasi >= 2?}
+    F -->|No| G{Data >= 100?}
+    G -->|No| H[Error: Variasi Kurang]
+    G -->|Yes| I[Force Mode]
+    F -->|Yes| J[Split 80/20]
+    I --> J
+    J --> K[Train Model]
+    K --> L[Evaluate]
+    L --> M[Save Model]
+    M --> N[Complete]
+    C --> N
+    H --> N
+```
+
+**Penjelasan Flowchart Training AI:**
+
+| Step | Node | Penjelasan |
+|------|------|------------|
+| Start | A | User menekan tombol Train di dashboard |
+| Check Data | B | Cek apakah data sensor >= 50 sampel |
+| Error 1 | C | GAGAL: data tidak cukup untuk training |
+| Prepare | D | Ekstrak 4 fitur: temp, humidity, air_quality, light |
+| Labels | E | Generate label: Hot, Cold, Normal, Humid, dll |
+| Check Variety | F | Cek apakah ada minimal 2 label berbeda |
+| Check Force | G | Jika 1 kelas, cek apakah data >= 100 |
+| Error 2 | H | GAGAL: hanya 1 kelas dan data < 100 |
+| Force | I | Tambah data sintetis untuk variasi |
+| Split | J | Bagi data: 80% train, 20% test |
+| Train | K | Training Random Forest dengan 120 trees |
+| Evaluate | L | Hitung accuracy, F1, balanced accuracy |
+| Save | M | Simpan model ke file .pkl |
+| Complete | N | Training selesai |
+
+**Syarat Training:**
+- Minimal 50 data sensor
+- Minimal 2 label berbeda (atau 100+ data untuk force mode)
+- Label dihasilkan otomatis berdasarkan aturan
+
+---
+
+## 🔮 ALUR PREDIKSI CUACA
+
+### Diagram 7: Flowchart Prediksi
+
+```mermaid
+graph TD
+    A[Data Masuk] --> B{Auto-predict?}
+    B -->|No| C[Skip]
+    B -->|Yes| D{Data >= 10?}
+    D -->|No| C
+    D -->|Yes| E[ML Predict]
+    E --> F{Trained?}
+    F -->|No| G[conf = 0]
+    F -->|Yes| H[Get Proba]
+    G --> I[Fuzzy Forecast]
+    H --> I
+    I --> J{Trained?}
+    J -->|Yes| K[Blend 70/30]
+    J -->|No| L[Fuzzy Only]
+    K --> M[Final Result]
+    L --> M
+    M --> N[Store History]
+    N --> O{Firebase?}
+    O -->|Yes| P[Save Firebase]
+    O -->|No| Q[Broadcast]
+    P --> Q
+    Q --> R[Complete]
+    C --> R
+```
+
+**Penjelasan Flowchart Prediksi:**
+
+| Step | Node | Penjelasan |
+|------|------|------------|
+| Start | A | Data sensor baru masuk dari ESP32 |
+| Check Auto | B | Cek apakah fitur prediksi otomatis aktif |
+| Skip | C | Lewati prediksi jika nonaktif |
+| Check Data | D | Minimal 10 data historis untuk prediksi |
+| ML Predict | E | Proses prediksi dengan model Random Forest |
+| Check Trained | F | Cek apakah model sudah terlatih |
+| Zero Conf | G | Model belum trained, confidence = 0 |
+| Get Proba | H | Jalankan prediksi, hitung probabilitas |
+| Fuzzy | I | Prediksi dengan logika fuzzy (1h, 2h, 3h) |
+| Check Blend | J | Tentukan metode penggabungan |
+| Blend | K | Gabungkan: 70% ML + 30% Fuzzy |
+| Fuzzy Only | L | Gunakan hanya fuzzy jika ML tidak aktif |
+| Final | M | Hasil akhir: weather_type, rain_prob, rekomendasi |
+| Store | N | Simpan ke riwayat prediksi (max 50) |
+| Check FB | O | Cek apakah Firebase aktif |
+| Save FB | P | Simpan prediksi ke Firebase |
+| Broadcast | Q | Kirim hasil ke dashboard via WebSocket |
+| Complete | R | Prediksi selesai |
+
+**Output Prediksi:**
+- [weather_type](file:///c:/Users/opera/Downloads/weather-station-server/weather-station-server/backend/app.py#1295-1303): Cerah, Berawan, Mendung, Hujan
+- [rain_probability](file:///c:/Users/opera/Downloads/weather-station-server/weather-station-server/backend/app.py#1271-1294): 0-100%
+- `confidence`: 0-1.0
+- [recommendations](file:///c:/Users/opera/Downloads/weather-station-server/weather-station-server/backend/app.py#1211-1247): Saran berdasarkan kondisi
+
+---
+
+## 📡 API ENDPOINTS
+
+### Data Sensor
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/sensor-data` | POST | Terima data sensor dari ESP32 |
+| `/api/dashboard-stats` | GET | Statistik dashboard |
+| `/api/historical-data` | GET | Data historis |
+
+### AI/ML
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/train-model` | POST | Training manual AI model |
+| `/api/predictions` | GET | Riwayat prediksi |
+| `/api/ai/status` | GET | Status AI model |
+| `/api/forecast` | GET | Forecast 3 jam |
+
+### Firebase
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/test-firebase` | GET | Test koneksi |
+| `/api/firebase/connect` | POST | Aktifkan Firebase |
+| `/api/firebase/disconnect` | POST | Nonaktifkan Firebase |
+
+### Status & Config
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/health` | GET | Health check |
+| `/api/status` | GET | Status real-time |
+| `/api/config` | GET | Konfigurasi server |
+| `/api/client-settings` | GET/POST | Pengaturan client |
+
+### Device
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/devices/{id}/config` | POST | Simpan config device |
+| `/api/devices/{id}/commands` | GET | Polling perintah |
+| `/api/devices/{id}/ack` | POST | ACK penerapan |
+
+### Backup
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/backup` | POST | Backup data |
+| `/api/restore` | POST | Restore data |
+| `/api/export-csv` | GET | Export CSV |
+
+---
+
+## 🔌 WEBSOCKET EVENTS
+
+### Events Server → Client
+| Event | Payload | Deskripsi |
+|-------|---------|-----------|
+| `sensor_update` | `{temp, humidity, ...}` | Data sensor baru |
+| `status_update` | `{firebase, esp32, ...}` | Status koneksi |
+| `client_settings_update` | `{interval, ...}` | Pengaturan client |
+| `training_progress` | `{status, progress}` | Progress training |
+
+### Events Client → Server
+| Event | Deskripsi |
+|-------|-----------|
+| [connect](file:///c:/Users/opera/Downloads/weather-station-server/weather-station-server/backend/app.py#711-719) | Client terhubung |
+| [disconnect](file:///c:/Users/opera/Downloads/weather-station-server/weather-station-server/backend/app.py#720-724) | Client terputus |
+| `request_status` | Request status terkini |
+
+---
+
+## 🧠 AI MODEL DETAIL
+
+### Features (Input)
+| No | Feature | Satuan | Range |
+|----|---------|--------|-------|
+| 1 | Temperature | °C | -50 to 80 |
+| 2 | Humidity | % | 0 to 100 |
+| 3 | Air Quality | PPM | 0 to 1000+ |
+| 4 | Light Intensity | Lux | 0 to 200000 |
+
+### Labels (Output)
+| Label | Kondisi |
+|-------|---------|
+| Normal | Kondisi cuaca normal |
+| Hot Humid | Panas dan lembab |
+| Hot Dry | Panas dan kering |
+| Very Hot | Sangat panas |
+| Cold | Dingin |
+| Cool Humid | Sejuk dan lembab |
+| Very Humid | Sangat lembab |
+| Polluted | Polusi tinggi (AQ > 300) |
+
+### Model Architecture
+| Parameter | Nilai |
+|-----------|-------|
+| Algorithm | Random Forest Classifier |
+| Estimators | 120 trees |
+| Class Weight | balanced_subsample |
+| Max Depth | None (unlimited) |
+| Scaler | StandardScaler |
+
+### Metrics
+| Metric | Deskripsi |
+|--------|-----------|
+| Train Accuracy | Akurasi pada training set |
+| Test Accuracy | Akurasi pada test set |
+| Macro F1 | F1 rata-rata semua kelas |
+| Balanced Acc | Akurasi diseimbangkan |
+
+---
+
+## 💾 STRUKTUR DATA
+
+### Local Storage
+
+```
+data/
+├── backups/                    # Backup harian
+│   ├── backup_20260123.json
+│   └── backup_20260122.json
+├── models/                     # ML models
+│   ├── weather_model.pkl       # Random Forest
+│   ├── scaler.pkl              # StandardScaler
+│   └── weather_model.meta.json # Metadata
+├── device_configs/             # Config per device
+│   ├── esp32-1.json
+│   └── esp32-2.json
+├── devices.json                # Device registry
+├── client_settings.json        # Dashboard settings
+├── raw_payloads.log            # Debug log
+└── runtime_config.json         # Runtime config
+```
+
+### Firebase Structure
+
+```
+/
+├── sensor_data/
+│   ├── push_id_1: {temp: 28.5, humidity: 65, ...}
+│   └── push_id_2: {temp: 29.0, humidity: 63, ...}
+└── predictions/
+    ├── push_id_1: {condition: Normal, confidence: 0.85}
+    └── push_id_2: {condition: Hot Humid, confidence: 0.78}
+```
+
+**Contoh Data Sensor:**
+```json
+{
+  "temperature": 28.5,
+  "humidity": 65,
+  "air_quality": 45,
+  "light_intensity": 12000,
+  "battery_voltage": 4.1,
+  "timestamp": "2026-01-23T01:00:00Z"
+}
+```
+
+**Contoh Data Prediksi:**
+```json
+{
+  "condition": "Normal",
+  "confidence": 0.85,
+  "rain_probability": 20,
+  "weather_type": "Cerah",
+  "hourly_forecast": [...]
+}
+```
+
+---
+
+## 🚀 DEPLOYMENT
+
+### Arsitektur Docker
+
+```
+┌─────────────────────────────────────────────────┐
+│                  HOST MACHINE                    │
+│                localhost:9999                    │
+└───────────────────────┬─────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────┐
+│              DOCKER NETWORK                      │
+│  ┌─────────────────┐  ┌─────────────────────┐   │
+│  │     NGINX       │  │   WEATHER STATION   │   │
+│  │   Port 9999     │──│     Port 1111       │   │
+│  │   (alpine)      │  │   (Python 3.11)     │   │
+│  └─────────────────┘  └─────────────────────┘   │
+│           │                     │                │
+│  ┌────────▼─────────────────────▼────────────┐  │
+│  │            PERSISTENT VOLUMES              │  │
+│  │  ./data → /var/lib/weather-station        │  │
+│  │  ./logs → /var/log/weather-station        │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+**Penjelasan Docker:**
+| Container | Port | Fungsi |
+|-----------|------|--------|
+| Nginx | 9999 | Reverse proxy, serve static files |
+| Weather Station | 1111 | Flask backend + Socket.IO |
+
+| Volume | Mount Point | Isi |
+|--------|-------------|-----|
+| ./data | /var/lib/weather-station | Sensor data, ML models |
+| ./logs | /var/log/weather-station | Application logs |
+
+**Routing Nginx:**
+- `/api/*` → Proxy ke Flask:1111
+- `/socket.io/*` → Proxy ke Flask:1111 (WebSocket)
+- `/*` → Static files (frontend)
+
+### Environment Variables
+```bash
+# Firebase
+FIREBASE_API_KEY=...
+FIREBASE_DATABASE_URL=...
+FIREBASE_PROJECT_ID=...
+
+# Server
+HOST=0.0.0.0
+PORT=1111
+DEBUG=false
+LOG_LEVEL=INFO
+
+# Security
+DEVICE_SHARED_SECRET=...
+ADMIN_API_KEY=...
+
+# AI
+MODEL_TRAINING_INTERVAL=50
+PREDICTION_CONFIDENCE_THRESHOLD=0.6
+MIN_TRAIN_SAMPLES_PER_CLASS=10
+```
+
+---
+
+## 📊 STATUS BROADCASTING
+
+### Alur Status Update
+
+```
+┌─────────────┐     ┌─────────────────────┐     ┌─────────────┐
+│   EVENT     │────▶│ broadcast_status_   │────▶│  Socket.IO  │
+│   SOURCE    │     │      change()       │     │    Emit     │
+└─────────────┘     └─────────────────────┘     └──────┬──────┘
+                                                       │
+                    ┌──────────────────────────────────▼─────┐
+                    │           ALL CONNECTED CLIENTS         │
+                    └─────────────────────────────────────────┘
+```
+
+**Event Sources:**
+| Source | Trigger | Action |
+|--------|---------|--------|
+| Firebase | Connect/Disconnect | Broadcast 'firebase' status |
+| ESP32 | Data received | Broadcast 'esp32' connected |
+| ESP32 | Timeout 15s | Broadcast 'esp32' disconnected |
+| Server | Start/Stop | Broadcast 'server' online/offline |
+
+**Status Object:**
+```json
+{
+  "server_status": "online",
+  "server_connected": true,
+  "firebase_enabled": true,
+  "firebase_connected": true,
+  "esp32_connected": true,
+  "esp32_last_seen": "2026-01-23T01:00:00Z",
+  "data_source": "Firebase Real-time"
+}
+```
+
+---
+
+## 🔍 VALIDASI DATA
+
+### Sensor Payload Validation
+| No | Check | Deskripsi |
+|----|-------|-----------|
+| 1 | Required Fields | device_id, temp, humidity, air_quality, light, battery |
+| 2 | Numeric Coercion | Convert semua field numerik ke float |
+| 3 | Milli Detection | Auto-convert jika nilai > threshold |
+| 4 | Range Check | Temp: -50~80, Humidity: 0~100, Battery: 0~20 |
+| 5 | GPS Check | Lat: -90~90, Lon: -180~180 |
+| 6 | Timestamp | Convert ke ISO 8601 UTC (Z) |
+
+### Response Codes
+| Code | Meaning |
+|------|---------|
+| 200 | Data diterima sukses |
+| 400 | Data invalid atau field missing |
+| 500 | Server error |
+
+---
+
+## 🎯 FUZZY FORECAST
+
+### Komponen
+| No | Komponen | Fungsi |
+|----|----------|--------|
+| 1 | Linear Fit | Prediksi tren sensor |
+| 2 | Rain Calc | Hitung probabilitas hujan |
+| 3 | Weather Type | Klasifikasi cuaca |
+| 4 | Confidence | Hitung kepercayaan prediksi |
+| 5 | 3-Hour | Prediksi 1h, 2h, 3h |
+
+### Rain Probability Logic
+```
+IF humidity > 80 AND temp < 25:
+    rain_prob = 70-90%
+ELIF humidity > 70 AND light < 5000:
+    rain_prob = 50-70%
+ELIF humidity > 60:
+    rain_prob = 30-50%
+ELSE:
+    rain_prob = 0-30%
+```
+
+---
+
+## 🛠️ TROUBLESHOOTING
+
+### Common Issues
+
+| Problem | Solution |
+|---------|----------|
+| Permission Denied | `sudo chown -R <UID>:<GID> ./data ./logs` |
+| Firebase Failed | Cek FIREBASE_DATABASE_URL di .env |
+| Training Failed | Minimal 50 data, 2 label berbeda |
+| ESP32 Offline | Cek esp32_offline_seconds setting |
+
+---
+
+## 📝 KESIMPULAN
+
+**Weather Station Server** adalah sistem yang production-ready dengan fitur:
+
+✅ Real-time Data Processing via WebSocket  
+✅ AI/ML Predictions dengan Random Forest  
+✅ Dual Storage (Local + Firebase)  
+✅ Event-driven Status Broadcasting  
+✅ Comprehensive Validation & Normalization  
+✅ Docker Deployment dengan Nginx  
+✅ Device Management dengan Authentication  
+✅ Fuzzy Forecast Engine sebagai fallback  
+✅ Backup & Restore untuk data persistence  
+
+**Cocok untuk:**
+- 🏠 Home Weather Monitoring
+- 🏫 Educational IoT Projects
+- 🌾 Agricultural Weather Stations
+- 🏭 Industrial Environmental Monitoring
+
+---
+
+**Version**: 3.1  
+**Last Updated**: 2026-01-23
